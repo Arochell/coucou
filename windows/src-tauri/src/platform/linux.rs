@@ -854,6 +854,25 @@ mod tests {
         assert_eq!(xdg_user_dir("XDG_PICTURES_DIR=\"pics\"", "XDG_PICTURES_DIR", home), None);
         assert_eq!(xdg_user_dir("", "XDG_PICTURES_DIR", home), None);
     }
+
+    #[test]
+    fn no_console_strips_gtk_and_gstreamer_leakage() {
+        let mut cmd = Command::new("true");
+        cmd.env("GDK_BACKEND", "x11")
+            .env("GDK_DPI_SCALE", "0.8")
+            .env("GST_REGISTRY", "/tmp/reg")
+            .env("GST_REGISTRY_1_0", "/tmp/reg1")
+            .env("GST_PLUGIN_SYSTEM_PATH", "/tmp/sys")
+            .env("GST_PLUGIN_SYSTEM_PATH_1_0", "/tmp/sys1");
+        no_console(&mut cmd);
+        let envs: std::collections::HashMap<_, _> = cmd.get_envs().collect();
+        assert_eq!(envs.get(std::ffi::OsStr::new("GDK_BACKEND")), Some(&None));
+        assert_eq!(envs.get(std::ffi::OsStr::new("GDK_DPI_SCALE")), Some(&None));
+        assert_eq!(envs.get(std::ffi::OsStr::new("GST_REGISTRY")), Some(&None));
+        assert_eq!(envs.get(std::ffi::OsStr::new("GST_REGISTRY_1_0")), Some(&None));
+        assert_eq!(envs.get(std::ffi::OsStr::new("GST_PLUGIN_SYSTEM_PATH")), Some(&None));
+        assert_eq!(envs.get(std::ffi::OsStr::new("GST_PLUGIN_SYSTEM_PATH_1_0")), Some(&None));
+    }
 }
 
 // ── Flow dictation's pill ─────────────────────────────────────────────────────
@@ -948,28 +967,4 @@ fn apply_rects(gw: &impl IsA<gtk::Widget>, rects: &[(f64, f64, f64, f64)]) {
         ));
     }
     gdk_window.input_shape_combine_region(&region, 0, 0);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn no_console_strips_gtk_and_gstreamer_leakage() {
-        let mut cmd = Command::new("true");
-        cmd.env("GDK_BACKEND", "x11")
-            .env("GDK_DPI_SCALE", "0.8")
-            .env("GST_REGISTRY", "/tmp/reg")
-            .env("GST_REGISTRY_1_0", "/tmp/reg1")
-            .env("GST_PLUGIN_SYSTEM_PATH", "/tmp/sys")
-            .env("GST_PLUGIN_SYSTEM_PATH_1_0", "/tmp/sys1");
-        no_console(&mut cmd);
-        let envs: std::collections::HashMap<_, _> = cmd.get_envs().collect();
-        assert_eq!(envs.get(std::ffi::OsStr::new("GDK_BACKEND")), Some(&None));
-        assert_eq!(envs.get(std::ffi::OsStr::new("GDK_DPI_SCALE")), Some(&None));
-        assert_eq!(envs.get(std::ffi::OsStr::new("GST_REGISTRY")), Some(&None));
-        assert_eq!(envs.get(std::ffi::OsStr::new("GST_REGISTRY_1_0")), Some(&None));
-        assert_eq!(envs.get(std::ffi::OsStr::new("GST_PLUGIN_SYSTEM_PATH")), Some(&None));
-        assert_eq!(envs.get(std::ffi::OsStr::new("GST_PLUGIN_SYSTEM_PATH_1_0")), Some(&None));
-    }
 }
