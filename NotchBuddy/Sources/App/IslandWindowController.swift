@@ -58,6 +58,9 @@ final class IslandWindowController: NSWindowController {
     private var dragGhostSize: CGFloat = 0
     private var ghostCurrentOrigin: NSPoint = .zero
     private var highlightPanel: NSPanel? = nil
+    /// While Mochi is dragged near a corner (or the top centre): the place he will take.
+    private var snapPanel: NSPanel? = nil
+    private var snapShown: IslandPlacement? = nil
     private var highlightWindowPid: pid_t = 0
 
     // Notch real dimensions (set on init)
@@ -1145,6 +1148,7 @@ final class IslandWindowController: NSWindowController {
     private func hideDragGhost() {
         dragGhostPanel?.close()
         dragGhostPanel = nil
+        showSnapTarget(nil)
         highlightPanel?.close()
         highlightPanel = nil
         highlightWindowPid = 0
@@ -1155,14 +1159,72 @@ final class IslandWindowController: NSWindowController {
         guard let panel = dragGhostPanel else { return }
         let s = dragGhostSize
         let mouse = NSEvent.mouseLocation
+        #if !APPSTORE
+        // Near a corner (or the top centre): the place shows, and Mochi is pulled into it.
+        if let snap = snapTarget(at: mouse) {
+            let rect = snap.1
+            showSnapTarget(snap.0, rect: rect)
+            let c = NSPoint(x: rect.midX - s/2, y: rect.midY - s/2)
+            let k: CGFloat = 0.35
+            ghostCurrentOrigin = NSPoint(x: ghostCurrentOrigin.x + (c.x - ghostCurrentOrigin.x) * k,
+                                         y: ghostCurrentOrigin.y + (c.y - ghostCurrentOrigin.y) * k)
+            panel.setFrameOrigin(ghostCurrentOrigin)
+            return
+        }
+        showSnapTarget(nil)
+        #endif
         // Direct follow — bot is "held", no trailing lag
         ghostCurrentOrigin = NSPoint(x: mouse.x - s/2, y: mouse.y - s/2)
         panel.setFrameOrigin(ghostCurrentOrigin)
     }
 
+    /// The placement a drop at `mouse` would move the island to (not the one it has), and the
+    /// tile it will take on the screen.
+    private func snapTarget(at mouse: NSPoint) -> (IslandPlacement, CGRect)? {
+        guard let here = NSScreen.screens.first(where: { $0.frame.contains(mouse) }),
+              here == Self.islandScreen(),
+              let target = IslandPlacement.snap(mouse, screen: here.frame),
+              target != state.islandPlacement else { return nil }
+        return (target, target.dropTarget(screen: here.frame, visible: here.visibleFrame,
+                                          panelSize: Self.panelFrame.size))
+    }
+
+    private func showSnapTarget(_ target: IslandPlacement?, rect: CGRect = .zero) {
+        guard let target else {
+            snapPanel?.close()
+            snapPanel = nil
+            snapShown = nil
+            return
+        }
+        if snapShown == target, snapPanel != nil { return }
+        snapPanel?.close()
+        let p = NSPanel(contentRect: rect, styleMask: [.borderless, .nonactivatingPanel],
+                        backing: .buffered, defer: false)
+        p.backgroundColor = .clear
+        p.isOpaque = false
+        p.hasShadow = false
+        p.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 3)
+        p.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        p.ignoresMouseEvents = true
+        let host = NSHostingView(rootView: SnapTargetView(corner: target.isCorner))
+        host.frame = NSRect(origin: .zero, size: rect.size)
+        p.contentView = host
+        p.orderFront(nil)
+        snapPanel = p
+        snapShown = target
+        SoundEngine.shared.play("tick")
+    }
+
     // MARK: - Window highlight overlay (white border on target window during drag)
 
     private func updateWindowHighlight() {
+        // Over a corner's place: no window to attach to.
+        if snapShown != nil {
+            highlightPanel?.close()
+            highlightPanel = nil
+            highlightWindowPid = 0
+            return
+        }
         let mouse = NSEvent.mouseLocation
         // Listing every window is costly: skip while the pointer stays put (a window
         // moving under a still pointer is caught within a quarter second).
@@ -1426,8 +1488,8 @@ final class IslandWindowController: NSWindowController {
             let f = islandScreen().frame
             return NSPoint(x: f.midX - s / 2, y: f.maxY - s)
         }
-        let r = islandScreenRect(size: CGSize(width: app.notchWidth, height: app.notchHeight))
-        return NSPoint(x: r.minX + 40 - s / 2, y: r.midY - s / 2)
+        let r = islandScreenRect(size: CGSize(width: IslandPlacement.tile, height: IslandPlacement.tile))
+        return NSPoint(x: r.midX - s / 2, y: r.midY - s / 2)
     }
 
     /// The resting island for `screen`: the notch's size at the notch, or the small bar of a
@@ -2120,10 +2182,16 @@ func islandSize(mode: IslandMode, view: IslandView,
                 progress: Double = 0,
                 nw: CGFloat = IslandConst.notchWidth,
                 nh: CGFloat = IslandConst.notchHeight) -> (CGFloat, CGFloat) {
+    let corner = IslandPlacement.current.isCorner
     switch mode {
-    case .hidden:   return (nw, nh)
-    case .compact:  return (nw + 160, nh)
+    // In a corner, resting or compact: a square tile with Mochi alone.
+    case .hidden:   return corner ? (IslandPlacement.tile, IslandPlacement.tile) : (nw, nh)
+    case .compact:  return corner ? (IslandPlacement.tile, IslandPlacement.tile) : (nw + 160, nh)
     case .expanded:
+        if corner && view == .overview {
+            let s = MailLayout.detailHeight != nil ? IslandPlacement.homeReadingSize : IslandPlacement.homeSize
+            return (s.width, s.height)
+        }
         let layout = IslandConst.viewLayouts[view]!
         if view == .question, let h = QuestionLayout.height {
             return (IslandConst.expandedWidth, h)

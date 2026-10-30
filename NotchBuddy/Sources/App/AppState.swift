@@ -359,7 +359,10 @@ final class AppState: ObservableObject {
 
     /// Where the island lives on its screen: the notch, or a corner (IslandPlacement) — persisted.
     @Published var islandPlacement: IslandPlacement = .notch {
-        didSet { UserDefaults.standard.set(islandPlacement.rawValue, forKey: "islandPlacement") }
+        didSet {
+            IslandPlacement.current = islandPlacement
+            UserDefaults.standard.set(islandPlacement.rawValue, forKey: "islandPlacement")
+        }
     }
 
     // Screen hosting the island (notch screen by default) — persisted
@@ -588,7 +591,10 @@ final class AppState: ObservableObject {
         if let v = ud.object(forKey: "hotkeyFlags")   as? Int   { hotkeyFlags = UInt(v) }
         if let v = ud.object(forKey: "hotkeyCode")    as? Int   { hotkeyCode = UInt16(v) }
         if let v = ud.string(forKey: "islandDisplay") { islandDisplay = IslandDisplayChoice(storageValue: v) }
-        if let v = ud.string(forKey: "islandPlacement"), let p = IslandPlacement(rawValue: v) { islandPlacement = p }
+        if let v = ud.string(forKey: "islandPlacement"), let p = IslandPlacement(rawValue: v) {
+            islandPlacement = p
+            IslandPlacement.current = p   // didSet doesn't run from init
+        }
         if let d = ud.data(forKey: "vercelProjectFilter"),
            let a = try? JSONDecoder().decode([String].self, from: d) { vercelProjectFilter = Set(a) }
         if let d = ud.data(forKey: "n8nWorkflowFilter"),

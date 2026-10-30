@@ -122,6 +122,13 @@ struct IslandContainer: View {
                 }
             }
 
+            // Open in a corner: the other pills' Mochis on a quarter circle around Mochi.
+            if state.mode == .expanded && state.view == .overview && state.islandPlacement.isCorner
+                && !uploadActive && !greetingActive {
+                CornerArcView(state: state, islandW: islandWidth, islandH: islandHeight)
+                    .transition(.opacity)
+            }
+
             // Single BotPlacement — always alive in the view tree so spring animations
             // fire from the current position (e.g. choose at 60,101) when canvas deactivates.
             // Hidden during upload canvas or greeting (both draw their own Mochi).
@@ -154,7 +161,8 @@ struct IslandContainer: View {
             }
 
             Group {
-                if state.mode == .compact {
+                // In a corner the tile holds Mochi alone: no room for the mini Mochis.
+                if state.mode == .compact && !state.islandPlacement.isCorner {
                     CompactMiniGrid(state: state)
                         .scaleEffect(IslandRestingLayout(width: islandWidth, height: islandHeight).miniGridScale)
                         .position(x: islandWidth - 40, y: islandHeight / 2)
@@ -416,6 +424,19 @@ struct BotPlacement: View {
 
 func botPosition(mode: IslandMode, view: IslandView, islandW: CGFloat, islandH: CGFloat, uploadProgress: Double, hasNotch: Bool = true) -> (CGFloat, CGFloat, CGFloat, Double) {
     let resting = IslandRestingLayout(width: islandW, height: islandH)
+    let placement = IslandPlacement.current
+    if placement.isCorner {
+        switch mode {
+        // The corner tile: Mochi alone, big, in its middle.
+        case .hidden, .compact:
+            return (islandW / 2, islandH / 2, min(38, max(0, islandH - 22)), 1)
+        case .expanded where view == .overview:
+            // Open: Mochi in the island's corner, the other pills around him (CornerArcView).
+            let c = placement.cornerBotCenter(in: CGSize(width: islandW, height: islandH))
+            return (c.x, c.y, 58, 1)
+        default: break
+        }
+    }
     switch mode {
     case .hidden:
         return hasNotch ? (46, 16, 6, 0)
@@ -529,9 +550,15 @@ struct IslandContentView: View {
     @State private var mailExtra: CGFloat = 0
 
     var body: some View {
+        let placement = state.islandPlacement
+        // Home open in a top corner: Mochi and his circle take the corner, the header the rest.
+        let cornerHome = placement.isCorner && state.view == .overview
+        let headerGap: CGFloat = cornerHome && !placement.isBottom ? 180 : 0
         VStack(spacing: 0) {
             IslandHeader(state: state)
                 .frame(height: 34)
+                .padding(.leading, placement.isLeft ? headerGap : 0)
+                .padding(.trailing, placement.isRight ? headerGap : 0)
                 .opacity(state.view == .confused ? 0 : 1)
                 .animation(.easeInOut(duration: 0.2), value: state.view == .confused)
 
@@ -542,6 +569,7 @@ struct IslandContentView: View {
                     // chat (prompt) is always flexible; mail is flexible only when active so
                     // it doesn't push the ZStack taller when inactive.
                     let isTall = v == .prompt || ((v == .mail || v == .whatsNew) && active)
+                        || (v == .overview && active && cornerHome)
                     let anim: Animation = active
                         ? .spring(response: 0.4, dampingFraction: 0.8).delay(0.16)
                         : .easeIn(duration: 0.16)
@@ -550,7 +578,7 @@ struct IslandContentView: View {
                         // but stop their endless animations: nobody sees them.
                         .environment(\.islandViewActive, active)
                         .frame(maxWidth: .infinity)
-                        .frame(height: isTall ? nil : (v == .overview ? 98 + mailExtra : 98),
+                        .frame(height: isTall ? nil : (v == .overview ? 98 + (placement.isCorner ? 0 : mailExtra) : 98),
                                alignment: v == .overview ? .top : .center)
                         .frame(minHeight: (isTall && !active) ? 0 : nil, maxHeight: isTall ? .infinity : nil)
                         .opacity(active ? 1 : 0)

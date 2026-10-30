@@ -23,6 +23,58 @@ enum IslandPlacement: String, CaseIterable, Sendable {
     static let side: CGFloat = 40
     /// A drop of Mochi this close to a corner of the screen moves the island there.
     static let snapDistance: CGFloat = 180
+    /// The resting island in a corner: a square tile with Mochi alone (no mini Mochis).
+    static let tile: CGFloat = 60
+    /// Open in a corner, Mochi sits this far from the island's corner (its centre)…
+    static let cornerInset: CGFloat = 56
+    /// …and the other pills' Mochis sit on a quarter circle of this radius around him.
+    static let arcRadius: CGFloat = 104
+    /// The home view open in a corner (the Mail card reading a message: `homeReadingSize`).
+    static let homeSize = CGSize(width: 640, height: 230)
+    static let homeReadingSize = CGSize(width: 640, height: 290)
+
+    /// The placement the views read without reaching AppState (set by AppState.islandPlacement).
+    nonisolated(unsafe) static var current: IslandPlacement = .notch
+
+    /// Mochi's centre in an open island of `size`, in the island's own coordinates (y down):
+    /// in its corner.
+    func cornerBotCenter(in size: CGSize) -> CGPoint {
+        let i = Self.cornerInset
+        return CGPoint(x: isRight ? size.width - i : i, y: isBottom ? size.height - i : i)
+    }
+
+    /// The other pills' Mochis around him (y down): `count` points on the quarter circle that
+    /// faces the inside of the screen, from the side along the edge to the side going inwards.
+    func arcPoints(count: Int, in size: CGSize) -> [CGPoint] {
+        guard count > 0, isCorner else { return [] }
+        let c = cornerBotCenter(in: size), r = Self.arcRadius
+        // Angles (degrees, y down): the quarter facing away from the corner.
+        let (from, to): (Double, Double) = switch self {
+        case .topRight: (180, 90)
+        case .topLeft: (0, 90)
+        case .bottomRight: (180, 270)
+        case .bottomLeft: (0, -90)
+        case .notch: (0, 0)
+        }
+        let pad = 10.0
+        let a0 = from + (to > from ? pad : -pad), a1 = to - (to > from ? pad : -pad)
+        return (0..<count).map { i in
+            let t = count == 1 ? 0.5 : Double(i) / Double(count - 1)
+            let a = (a0 + (a1 - a0) * t) * .pi / 180
+            return CGPoint(x: c.x + r * CGFloat(cos(a)), y: c.y + r * CGFloat(sin(a)))
+        }
+    }
+
+    /// The tile a drop at this placement shows (screen coordinates, y up): the corner's resting
+    /// island, or a notch-sized bar at the top centre.
+    func dropTarget(screen: CGRect, visible: CGRect, panelSize: CGSize) -> CGRect {
+        guard isCorner else {
+            return CGRect(x: screen.midX - 100, y: screen.maxY - 34, width: 200, height: 34)
+        }
+        let o = panelOrigin(screen: screen, visible: visible, panelSize: panelSize)
+        return islandRect(panelSize: panelSize, size: CGSize(width: Self.tile, height: Self.tile))
+            .offsetBy(dx: o.x, dy: o.y)
+    }
 
     /// The panel's origin on the screen. `screen` is the screen's frame, `visible` its visible
     /// frame (without the menu bar and the Dock).
