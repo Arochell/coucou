@@ -43,6 +43,24 @@ final class FileDropNSView: NSView {
 // MARK: - File drop handler
 
 enum FileDropHandler {
+    /// Removes inbox files older than 7 days, as on Windows/Linux.
+    static func sweepInbox(inbox: URL) {
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: inbox,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: .skipsHiddenFiles
+        ) else { return }
+        let keepFor: TimeInterval = 7 * 24 * 60 * 60
+        let now = Date()
+        for entry in entries {
+            guard let values = try? entry.resourceValues(forKeys: [.contentModificationDateKey]),
+                  let modified = values.contentModificationDate else { continue }
+            if now.timeIntervalSince(modified) > keepFor {
+                try? FileManager.default.removeItem(at: entry)
+            }
+        }
+    }
+
     @MainActor
     static func handle(urls: [URL], state: AppState) async {
         guard let url = urls.first else { return }
@@ -62,13 +80,26 @@ enum FileDropHandler {
         let inbox = HookServer.supportDir.appendingPathComponent("inbox")
         Task.detached {
             try? FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
-            let dest = inbox.appendingPathComponent(name)
-            try? FileManager.default.removeItem(at: dest)
-            if (try? FileManager.default.copyItem(at: url, to: dest)) != nil {
-                await MainActor.run {
-                    state.droppedFile = DroppedFile(url: dest, name: name)
-                    state.promptContext = .file(name: name, fileURL: dest)
+            var dest = inbox.appendingPathComponent(name)
+            if FileManager.default.fileExists(atPath: dest.path) && dest != url {
+                let stem = url.deletingPathExtension().lastPathComponent
+                let ext = url.pathExtension.isEmpty ? "" : ".\(url.pathExtension)"
+                for i in 2..<1000 {
+                    let candidate = inbox.appendingPathComponent("\(stem) (\(i))\(ext)")
+                    if !FileManager.default.fileExists(atPath: candidate.path) {
+                        dest = candidate
+                        break
+                    }
                 }
+            }
+            if dest != url {
+                _ = try? FileManager.default.copyItem(at: url, to: dest)
+            }
+            try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: dest.path)
+            Self.sweepInbox(inbox: inbox)
+            await MainActor.run {
+                state.droppedFile = DroppedFile(url: dest, name: name)
+                state.promptContext = .file(name: name, fileURL: dest)
             }
         }
 
