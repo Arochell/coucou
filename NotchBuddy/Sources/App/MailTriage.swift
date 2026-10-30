@@ -239,7 +239,9 @@ enum MailScript {
 
     /// Messages of every account's inbox matching `whose`, in the list format of
     /// MailController.parseList (unread count first, then one record per message).
-    static func searchScript(whose: String, today: Bool) -> String {
+    /// At most `limit` messages per inbox, the newest: an inbox with a thousand unread
+    /// messages answers in a second, and the other scripts (a message opened) don't wait.
+    static func searchScript(whose: String, today: Bool, limit: Int = 60) -> String {
         """
         set RS to character id 30
         set US to character id 31
@@ -271,7 +273,22 @@ enum MailScript {
                         set dts to date received of (every message of mb whose \(whose))
                         set rds to read status of (every message of mb whose \(whose))
                         set fls to flagged status of (every message of mb whose \(whose))
-                        repeat with i from 1 to count of ids
+                        set c to count of ids
+                        set a to 1
+                        set b to c
+                        if c > \(limit) then
+                            -- The newest: the start of the list when message 1 is the most recent.
+                            try
+                                if (item 1 of dts) < (item c of dts) then
+                                    set a to c - \(limit) + 1
+                                else
+                                    set b to \(limit)
+                                end if
+                            on error
+                                set b to \(limit)
+                            end try
+                        end if
+                        repeat with i from a to b
                             try
                                 set s to item i of subs
                                 if s is missing value then set s to ""

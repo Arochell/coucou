@@ -179,6 +179,16 @@ struct IslandContainer: View {
             cornerRadius     = state.mode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
             islandTopRadius  = 0
         }
+        .onReceive(NotificationCenter.default.publisher(for: .islandResize)) { _ in
+            guard state.mode == .expanded, state.view != .prompt else { return }
+            let (w, h) = islandSize(mode: .expanded, view: state.view,
+                                    progress: state.uploadProgress,
+                                    nw: state.notchWidth, nh: state.notchHeight)
+            withAnimation(openSpring) {
+                islandWidth  = w
+                islandHeight = h
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .botGreet)) { _ in
             greetNotif.toggle()
         }

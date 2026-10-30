@@ -69,7 +69,11 @@ struct HubMailOverviewPage: View {
             }
             HubCard {
                 if store.journal.isEmpty {
-                    HubEmptyState(text: String(localized: "hub.mail.journal-empty"), state: .idle, color: mailBlue)
+                    // Sorting on and messages looked at: say so, it works, nothing matched yet.
+                    HubEmptyState(text: store.settings.autoSort && store.checkedToday > 0
+                                  ? String(format: String(localized: "hub.mail.checked %lld"), Int64(store.checkedToday))
+                                  : String(localized: "hub.mail.journal-empty"),
+                                  state: .idle, color: mailBlue)
                 } else {
                     ForEach(Array(store.journal.prefix(100).enumerated()), id: \.element.id) { i, entry in
                         if i > 0 { HubDivider() }

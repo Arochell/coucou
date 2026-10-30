@@ -124,6 +124,27 @@ final class MailTriageStore: ObservableObject {
         save(journal, to: "journal.json")
     }
 
+    /// New messages the automatic sorting looked at today, matched or not (the Overview shows
+    /// it while nothing was sorted: it is working, nothing matched).
+    @Published private(set) var checkedToday: Int = {
+        let d = UserDefaults.standard
+        return d.string(forKey: "mailCheckedDay") == MailTriageStore.dayKey() ? d.integer(forKey: "mailCheckedCount") : 0
+    }()
+
+    func countChecked(_ n: Int) {
+        let d = UserDefaults.standard
+        let day = Self.dayKey()
+        let base = d.string(forKey: "mailCheckedDay") == day ? d.integer(forKey: "mailCheckedCount") : 0
+        d.set(day, forKey: "mailCheckedDay")
+        d.set(base + n, forKey: "mailCheckedCount")
+        checkedToday = base + n
+    }
+
+    nonisolated private static func dayKey() -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        return "\(c.year ?? 0)-\(c.month ?? 0)-\(c.day ?? 0)"
+    }
+
     /// What was sorted today, for the Overview.
     var today: (sorted: Int, junk: Int, important: Int) {
         let start = Calendar.current.startOfDay(for: Date())

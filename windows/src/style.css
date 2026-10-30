@@ -3057,6 +3057,8 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
   padding: 1px 6px;
   border-radius: 999px;
   background: rgba(47, 140, 255, 0.14);
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .mail-spacer {
@@ -3092,15 +3094,24 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
 .mail-filters {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   padding-top: 4px;
+  /* One line whatever the language: a longer set scrolls sideways, never wraps. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mail-filters::-webkit-scrollbar {
+  display: none;
 }
 
 .mail-chip {
   border: 0;
   border-radius: 999px;
-  padding: 2px 7px;
+  padding: 2px 6px;
   background: transparent;
+  white-space: nowrap;
+  flex: 0 0 auto;
   font: 400 9.5px var(--font);
   color: #6b7079;
   cursor: default;
@@ -3117,10 +3128,21 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
   background: rgba(47, 140, 255, 0.22);
 }
 
-.mail-searching {
-  font: 400 9.5px var(--font);
-  color: #6b7079;
-  padding-left: 4px;
+/* A search in progress, in the header: the filters keep their line. */
+.mail-spinner {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(142, 147, 156, 0.35);
+  border-top-color: #8e939c;
+  animation: mail-spin 0.8s linear infinite;
+}
+
+@keyframes mail-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .mail-rows {
