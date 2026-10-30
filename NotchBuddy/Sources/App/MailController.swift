@@ -236,11 +236,13 @@ final class MailController: ObservableObject {
     }
 
     /// How deep the search and the filters look: the newest messages of each inbox, read in
-    /// one go (a `whose` search in Mail scans the whole mailbox and freezes Mail on a big one).
-    nonisolated static let searchDepth = 400
+    /// short steps like the card's own list (a `whose` search in Mail scans the whole mailbox
+    /// and freezes it; one big read takes Mail too long on a busy inbox).
+    nonisolated static let searchDepth = 300
+    nonisolated static let searchStep = 50
 
     /// Filters the newest messages (read once, kept a minute) with the query and the filter;
-    /// nothing to search: back to the list.
+    /// nothing to search: back to the list. What is found shows as the steps come in.
     func runSearch() {
         let q = MailQuery.parse(query)
         guard !q.isEmpty || filter != .all else {
@@ -253,21 +255,35 @@ final class MailController: ObservableObject {
             searching = false
             return
         }
+        // At once: what the card already has.
+        results = Self.filtered(searchPool ?? messages, q, filter)
         searching = true
-        // One read at a time: a chip clicked during it is applied when it lands.
+        // One read at a time: a chip clicked during it is applied as the steps land.
         guard !poolFetching, Self.mailRunning() else { return }
         poolFetching = true
         Task {
-            let result = await runAppleScript(Self.listScript(perInbox: Self.searchDepth))
+            var pool: [String: MailMessage] = [:]
+            var skip = 0
+            while skip < Self.searchDepth {
+                let result = await runAppleScript(Self.listScript(perInbox: Self.searchStep, skip: skip))
+                guard case .success(let values) = result, let text = values.first else { break }
+                let got = Self.parseList(text).messages
+                for m in got { pool[m.id] = m }
+                skip += Self.searchStep
+                let q = MailQuery.parse(query)
+                guard searching, !q.isEmpty || filter != .all else { break }
+                results = Self.filtered(Array(pool.values), q, filter)
+                if got.isEmpty { break }
+            }
             poolFetching = false
-            if case .success(let values) = result, let text = values.first {
-                searchPool = Self.parseList(text).messages
+            if !pool.isEmpty {
+                searchPool = Array(pool.values)
                 searchPoolDate = Date()
             }
             let q = MailQuery.parse(query)
             guard searching, !q.isEmpty || filter != .all else { return }
             searching = false
-            results = searchPool.map { Self.filtered($0, q, filter) } ?? []
+            results = Self.filtered(searchPool ?? messages, q, filter)
         }
     }
 
@@ -480,7 +496,8 @@ final class MailController: ObservableObject {
 
     /// Unread count, then for each account's inbox its newest `perInbox` messages:
     /// id, account, mailbox, sender, subject, date (ISO), read status.
-    nonisolated static func listScript(perInbox: Int) -> String {
+    /// `skip` passes over the newest ones first: the search reads the inboxes in short steps.
+    nonisolated static func listScript(perInbox: Int, skip: Int = 0) -> String {
         """
         set RS to character id 30
         set US to character id 31
@@ -516,16 +533,17 @@ final class MailController: ObservableObject {
                     try
                         set n to count of messages of mb
                     end try
-                    if n > 0 then
-                        set k to \(perInbox)
-                        if n < k then set k to n
+                    if n > \(skip) then
+                        set s to \(skip)
+                        set e to s + \(perInbox)
+                        if e > n then set e to n
                         -- Newest first when message 1 is the most recent, else read from the end.
-                        set a to 1
-                        set b to k
+                        set a to s + 1
+                        set b to e
                         try
                             if (date received of message 1 of mb) < (date received of message n of mb) then
-                                set a to n - k + 1
-                                set b to n
+                                set a to n - e + 1
+                                set b to n - s
                             end if
                         end try
                         -- One request per field for the whole range (not one per message).
