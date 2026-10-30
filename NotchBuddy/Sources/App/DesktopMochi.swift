@@ -202,6 +202,7 @@ final class DesktopMochiController {
         p.level = .floating
         p.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         p.ignoresMouseEvents = true
+        p.hidesOnDeactivate = false
         if !p.isVisible { p.orderFront(nil) }
 
         // Squash emote + sound on landing
@@ -417,6 +418,7 @@ final class DesktopMochiController {
         p.backgroundColor = .clear
         p.isOpaque = false
         p.hasShadow = false
+        p.hidesOnDeactivate = false
         return p
     }
 
