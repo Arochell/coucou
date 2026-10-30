@@ -309,31 +309,32 @@ struct MailDetailView: View {
             // (36 pt from the edge, like every card header).
             .padding(.trailing, 24)
 
-            Text(message.subject.isEmpty ? " " : message.subject)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(Color(hex: "#C5C8CD"))
-                .lineLimit(2).truncationMode(.tail)
-                .fixedSize(horizontal: false, vertical: true)
-
-            // The text, scrollable, in all the room left.
+            // The subject in full, then the text: one scroll, in all the room left.
             ScrollView(.vertical, showsIndicators: false) {
-                Group {
-                    if let text = mail.previews[message.id] {
-                        Text(text.isEmpty ? String(localized: "mail.preview-empty") : text)
-                    } else if mail.previewFailed.contains(message.id) {
-                        Text("mail.preview-failed")
-                    } else {
-                        HStack(spacing: 6) {
-                            MailSpinner()
-                            Text("Loading…")
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(message.subject.isEmpty ? " " : message.subject)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color(hex: "#C5C8CD"))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Group {
+                        if let text = mail.previews[message.id] {
+                            Text(text.isEmpty ? String(localized: "mail.preview-empty") : text)
+                        } else if mail.previewFailed.contains(message.id) {
+                            Text("mail.preview-failed")
+                        } else {
+                            HStack(spacing: 6) {
+                                MailSpinner()
+                                Text("Loading…")
+                            }
                         }
                     }
+                    .font(.system(size: 10.5))
+                    .foregroundColor(Color(hex: "#9398A1"))
+                    .lineSpacing(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
                 }
-                .font(.system(size: 10.5))
-                .foregroundColor(Color(hex: "#9398A1"))
-                .lineSpacing(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
             }
             .frame(maxHeight: .infinity)
 

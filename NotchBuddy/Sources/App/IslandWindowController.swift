@@ -2054,7 +2054,7 @@ extension Notification.Name {
 /// The home view grows while a mail is open in the Mail card, so it can be read.
 enum MailLayout {
     nonisolated(unsafe) static var detailHeight: CGFloat?
-    static let readingHeight: CGFloat = 250
+    static let readingHeight: CGFloat = 280
 }
 
 // MARK: - islandSize (takes real notch dimensions)

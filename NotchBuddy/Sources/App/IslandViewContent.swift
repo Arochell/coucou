@@ -71,7 +71,9 @@ struct OverviewView: View {
     var agent: AgentTask? { state.focusTask }
 
     var body: some View {
-        HStack(spacing: 10) {
+        // Top-aligned: a mail open in the Mail card makes the left card taller, downwards
+        // only; the pills on the right keep their place and their height (98 pt).
+        HStack(alignment: .top, spacing: 10) {
             // Left card: title row + ticker below + ↗ button overlay
             ZStack(alignment: .topLeading) {
                 CardBackground(wash: nil)
@@ -200,6 +202,7 @@ struct OverviewView: View {
             CardBackground(wash: nil) {
                 AgentPillsView(state: state)
             }
+            .frame(height: 98)
         }
         .onChange(of: state.focusId) { _, new in
             showingN8nDetail = false
