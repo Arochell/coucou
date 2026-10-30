@@ -71,6 +71,7 @@ export async function mailOverviewPage(page: HTMLElement, ctx: HubContext) {
   } else if (!view.outlookOpen) {
     sortCard.append(divider(), h("div", { class: "hub-note", text: t("Outlook is closed: nothing is sorted until it is open.") }));
   }
+  sortCard.dataset.anchor = "mail.autosort";
   page.append(sortCard);
 
   const stat = (value: number, text: string, color: string) =>
@@ -179,6 +180,7 @@ export async function mailRulesPage(page: HTMLElement, ctx: HubContext) {
   ));
 
   const list = card();
+  list.dataset.anchor = "mail.rules";
   page.append(list);
   const drawRules = () => {
     clear(list);
@@ -242,7 +244,9 @@ function chipsPage(
       chips.append(h("span", { class: "hub-chip" }, h("span", { text: w }), remove));
     }
   };
-  page.append(card(h("div", { class: "hub-row" }, field, button(t("Add"), add, "primary")), chips));
+  const chipsCard = card(h("div", { class: "hub-row" }, field, button(t("Add"), add, "primary")), chips);
+  chipsCard.dataset.anchor = id === "mailBanned" ? "mail.banned" : "mail.vip";
+  page.append(chipsCard);
   draw();
 }
 
