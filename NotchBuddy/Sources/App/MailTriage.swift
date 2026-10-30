@@ -235,6 +235,22 @@ enum MailSearch {
 }
 
 enum MailScript {
+    /// AppleScript that sets `m` to message `id` of `mailbox` (a reference such as
+    /// `mailbox "INBOX" of acc`): straight by its id, without reading the mailbox. Written
+    /// «class mssg» because "message id" is also a property of Mail's messages (their
+    /// Message-ID). If Mail refuses it, the mailbox is searched as before.
+    static func findMessage(_ id: Int, in mailbox: String) -> String {
+        """
+        set m to missing value
+        try
+            set m to «class mssg» id \(id) of \(mailbox)
+            get id of m
+        on error
+            set m to first message of \(mailbox) whose id is \(id)
+        end try
+        """
+    }
+
     /// A string inside AppleScript double quotes.
     static func quote(_ s: String) -> String {
         "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
@@ -311,7 +327,7 @@ enum MailScript {
         """
         tell application id "com.apple.mail"
             set acc to account \(quote(account))
-            set m to message id \(messageId) of mailbox \(quote(mailbox)) of acc
+            \(findMessage(messageId, in: "mailbox \(quote(mailbox)) of acc"))
             set rid to ""
             try
                 set rid to message id of m

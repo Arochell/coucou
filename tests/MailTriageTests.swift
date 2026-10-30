@@ -93,8 +93,8 @@ enum MailTriageTests {
 
     static func scripts() {
         let a = MailScript.applyScript(account: "Pro", mailbox: "INBOX", messageId: 42, action: .junk)
-        precondition(a.contains("account \"Pro\"") && a.contains("message id 42 of mailbox"))
-        precondition(!a.contains("whose id is"), "a direct reference, not a scan of the mailbox")
+        precondition(a.contains("account \"Pro\"") && a.contains("«class mssg» id 42 of mailbox \"INBOX\" of acc"))
+        precondition(a.contains("get id of m"), "the direct reference is checked, the scan is only the fallback")
         precondition(a.contains("set junk mail status of m to true") && a.contains("move m to junk mailbox"))
         precondition(a.contains("message id of m"))
         let mv = MailScript.applyScript(account: "Pro", mailbox: "INBOX", messageId: 1, action: .move("Clients"))

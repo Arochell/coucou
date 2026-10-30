@@ -571,7 +571,7 @@ final class MailController: ObservableObject {
         """
         tell application id "com.apple.mail"
             set mb to mailbox "\(escape(message.mailbox))" of account "\(escape(message.account))"
-            set m to message id \(message.messageId) of mb
+            \(MailScript.findMessage(message.messageId, in: "mb"))
             \(body)
         end tell
         """
