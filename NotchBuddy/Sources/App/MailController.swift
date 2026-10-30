@@ -90,7 +90,10 @@ final class MailController: ObservableObject {
     /// What the search or the filter found; nil when neither is used (the card shows `messages`).
     @Published private(set) var results: [MailMessage]? = nil
     @Published private(set) var searching = false
-    private var searchToken = UUID()
+    /// The newest messages of each inbox, for the search and the filters (kept a minute).
+    private var searchPool: [MailMessage]? = nil
+    private var searchPoolDate: Date = .distantPast
+    private var poolFetching = false
 
     /// The list the card shows.
     var displayed: [MailMessage] { results ?? messages }
@@ -177,6 +180,7 @@ final class MailController: ObservableObject {
                 previews = [:]
                 loaded = false
                 results = nil
+                searchPool = nil
                 query = ""
                 filter = .all
                 shownCount = Self.keep
@@ -227,32 +231,50 @@ final class MailController: ObservableObject {
         runSearch()
     }
 
-    /// Searches every inbox for the query and the filter (nothing to search: back to the list).
+    /// How deep the search and the filters look: the newest messages of each inbox, read in
+    /// one go (a `whose` search in Mail scans the whole mailbox and freezes Mail on a big one).
+    nonisolated static let searchDepth = 400
+
+    /// Filters the newest messages (read once, kept a minute) with the query and the filter;
+    /// nothing to search: back to the list.
     func runSearch() {
         let q = MailQuery.parse(query)
-        guard let whose = MailScript.whoseClause(q, filter) else {
+        guard !q.isEmpty || filter != .all else {
             results = nil
             searching = false
             return
         }
-        guard Self.mailRunning() else { return }
-        let token = UUID()
-        searchToken = token
-        searching = true
-        Task {
-            let result = await runAppleScript(MailScript.searchScript(whose: whose, today: filter == .today))
-            guard searchToken == token else { return }
+        if let pool = searchPool, Date().timeIntervalSince(searchPoolDate) < 60 {
+            results = Self.filtered(pool, q, filter)
             searching = false
+            return
+        }
+        searching = true
+        // One read at a time: a chip clicked during it is applied when it lands.
+        guard !poolFetching, Self.mailRunning() else { return }
+        poolFetching = true
+        Task {
+            let result = await runAppleScript(Self.listScript(perInbox: Self.searchDepth))
+            poolFetching = false
             if case .success(let values) = result, let text = values.first {
-                results = Array(Self.parseList(text).messages.sorted { $0.date > $1.date }.prefix(Self.maxShown))
-            } else {
-                results = []
+                searchPool = Self.parseList(text).messages
+                searchPoolDate = Date()
             }
+            let q = MailQuery.parse(query)
+            guard searching, !q.isEmpty || filter != .all else { return }
+            searching = false
+            results = searchPool.map { Self.filtered($0, q, filter) } ?? []
         }
     }
 
+    nonisolated static func filtered(_ pool: [MailMessage], _ q: MailQuery, _ f: MailFilter) -> [MailMessage] {
+        Array(pool.filter {
+            MailSearch.matches(sender: $0.sender, subject: $0.subject, date: $0.date,
+                               isRead: $0.isRead, isFlagged: $0.isFlagged, query: q, filter: f)
+        }.sorted { $0.date > $1.date }.prefix(maxShown))
+    }
+
     func clearSearch() {
-        searchToken = UUID()
         query = ""
         filter = .all
         results = nil
@@ -312,6 +334,7 @@ final class MailController: ObservableObject {
         }
         messages = apply(messages)
         if let r = results { results = apply(r) }
+        if let p = searchPool { searchPool = apply(p) }
     }
 
     /// Puts back a message the journal shows as sorted.
@@ -458,11 +481,13 @@ final class MailController: ObservableObject {
         set RS to character id 30
         set US to character id 31
         tell application id "com.apple.mail"
+            -- Mail busy for 30 s: give up rather than queue more (it is never the user's wait).
+            with timeout of 30 seconds
             set uc to 0
             try
                 set uc to unread count of inbox
             end try
-            set out to (uc as string)
+            set L to {(uc as string)}
             set accs to {}
             try
                 set accs to (every account whose enabled is true)
@@ -481,6 +506,8 @@ final class MailController: ObservableObject {
                     end try
                 end try
                 if mb is not missing value then
+                    set accName to name of acc
+                    set mbName to name of mb
                     set n to 0
                     try
                         set n to count of messages of mb
@@ -522,15 +549,20 @@ final class MailController: ObservableObject {
                                     try
                                         set fl to ((item i of fls) as string)
                                     end try
-                                    set out to out & RS & ((item i of ids) as string) & US & (name of acc) & US & (name of mb) & US & f & US & s & US & d & US & ((item i of rds) as string) & US & fl
+                                    set end of L to ((item i of ids) as string) & US & accName & US & mbName & US & f & US & s & US & d & US & ((item i of rds) as string) & US & fl
                                 end try
                             end repeat
                         end try
                     end if
                 end if
             end repeat
-            return out
+            end timeout
         end tell
+        -- One join at the end (adding to a growing text each time is slow on long lists).
+        set AppleScript's text item delimiters to RS
+        set out to L as text
+        set AppleScript's text item delimiters to ""
+        return out
         """
     }
 
@@ -539,7 +571,7 @@ final class MailController: ObservableObject {
         """
         tell application id "com.apple.mail"
             set mb to mailbox "\(escape(message.mailbox))" of account "\(escape(message.account))"
-            set m to first message of mb whose id is \(message.messageId)
+            set m to message id \(message.messageId) of mb
             \(body)
         end tell
         """

@@ -73,21 +73,28 @@ enum MailTriageTests {
         precondition(MailQuery.parse("from: anne").from == ["anne"])
         precondition(MailQuery.parse("Subject:Hello").subject == ["Hello"])
         precondition(MailQuery.parse("   ").isEmpty)
-        precondition(MailScript.whoseClause(MailQuery(), .all) == nil)
-        let w = MailScript.whoseClause(q, .unread)!
-        precondition(w.contains("sender contains \"dupont\""))
-        precondition(w.contains("subject contains \"devis mai\""))
-        precondition(w.contains("(subject contains \"facture\" or sender contains \"facture\")"))
-        precondition(w.hasSuffix("read status is false"))
-        precondition(MailScript.whoseClause(MailQuery(), .today) == "date received > d0")
-        precondition(MailScript.whoseClause(MailQuery(), .flagged) == "flagged status is true")
+        // The notch's search and filters, on the messages Mail gave.
+        func m(_ sender: String, _ subject: String, read: Bool = false, flagged: Bool = false,
+               date: Date = Date(), _ q: String = "", _ f: MailFilter = .all) -> Bool {
+            MailSearch.matches(sender: sender, subject: subject, date: date, isRead: read, isFlagged: flagged,
+                               query: MailQuery.parse(q), filter: f)
+        }
+        precondition(m("Jean Dupont <jd@x.fr>", "Devis mai", "de:dupont objet:\"devis mai\""))
+        precondition(m("Jean Dupont <jd@x.fr>", "Facture urgente", "facture urgente"))
+        precondition(m("Jean Dupont <jd@x.fr>", "Réunion été", "reunion"), "accents don't matter")
+        precondition(!m("Anne <a@x.fr>", "Devis mai", "de:dupont"))
+        precondition(!m("Jean Dupont", "Hello", "facture"))
+        precondition(m("A", "B", read: false, "", .unread) && !m("A", "B", read: true, "", .unread))
+        precondition(m("A", "B", flagged: true, "", .flagged) && !m("A", "B", "", .flagged))
+        precondition(m("A", "B", "", .today) && !m("A", "B", date: Date(timeIntervalSinceNow: -3 * 86_400), "", .today))
         // Quotes and backslashes can't break out of the script.
         precondition(MailScript.quote("a\"b\\c") == "\"a\\\"b\\\\c\"")
     }
 
     static func scripts() {
         let a = MailScript.applyScript(account: "Pro", mailbox: "INBOX", messageId: 42, action: .junk)
-        precondition(a.contains("account \"Pro\"") && a.contains("whose id is 42"))
+        precondition(a.contains("account \"Pro\"") && a.contains("message id 42 of mailbox"))
+        precondition(!a.contains("whose id is"), "a direct reference, not a scan of the mailbox")
         precondition(a.contains("set junk mail status of m to true") && a.contains("move m to junk mailbox"))
         precondition(a.contains("message id of m"))
         let mv = MailScript.applyScript(account: "Pro", mailbox: "INBOX", messageId: 1, action: .move("Clients"))
@@ -99,12 +106,5 @@ enum MailTriageTests {
         let uf = MailScript.undoScript(account: "Pro", fromMailbox: "INBOX", rfcId: "<x@y>", action: .important)
         precondition(uf.contains("set flagged status of m to false"))
         precondition(!a.contains("delete"), "Coucou never deletes a message")
-        let sc = MailScript.searchScript(whose: "read status is false", today: false)
-        precondition(sc.contains("id of (every message of mb whose read status is false)"))
-        precondition(sc.contains("flagged status of (every message of mb whose read status is false)"))
-        precondition(!sc.contains("set d0"))
-        precondition(sc.contains("if c > 60 then") && sc.contains("repeat with i from a to b"), "the newest 60 at most")
-        precondition(MailScript.searchScript(whose: "read status is false", today: false, limit: 5).contains("set a to c - 5 + 1"))
-        precondition(MailScript.searchScript(whose: "date received > d0", today: true).contains(MailScript.todayPrelude))
     }
 }
