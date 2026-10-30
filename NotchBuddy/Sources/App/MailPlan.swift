@@ -336,7 +336,7 @@ extension MailScript {
         let test = onlyName.map { "(name of a) is \(quote($0))" } ?? "true"
         return """
         tell application id "com.apple.mail"
-            set m to message id \(messageId) of mailbox \(quote(mailbox)) of account \(quote(account))
+            \(MailScript.findMessage(messageId, in: "mailbox \(quote(mailbox)) of account \(quote(account))"))
             set out to ""
             repeat with a in mail attachments of m
                 if \(test) then
@@ -354,7 +354,7 @@ extension MailScript {
     static func replyDraftScript(account: String, mailbox: String, messageId: Int, body: String) -> String {
         """
         tell application id "com.apple.mail"
-            set m to message id \(messageId) of mailbox \(quote(mailbox)) of account \(quote(account))
+            \(MailScript.findMessage(messageId, in: "mailbox \(quote(mailbox)) of account \(quote(account))"))
             set r to reply m with opening window
             try
                 set content of r to \(quote(body)) & return & return & (content of r)
@@ -370,7 +370,7 @@ extension MailScript {
     static func detailsScript(account: String, mailbox: String, messageId: Int, textLimit: Int) -> String {
         """
         tell application id "com.apple.mail"
-            set m to message id \(messageId) of mailbox \(quote(mailbox)) of account \(quote(account))
+            \(MailScript.findMessage(messageId, in: "mailbox \(quote(mailbox)) of account \(quote(account))"))
             set out to ""
             try
                 repeat with a in mail attachments of m
