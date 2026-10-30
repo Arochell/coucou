@@ -234,17 +234,28 @@ pub fn user_full_name() -> Option<String> {
 
 // ── Processes ─────────────────────────────────────────────────────────────────
 
-/// Nothing to hide: a spawned process only gets a terminal if it asks for one.
+/// Prepares a command to launch a child process: strips Coucou's process-level
+/// GTK/GDK overrides (GDK_BACKEND, GDK_DPI_SCALE) and AppImage environment
+/// variables (GST_REGISTRY*) so they do not leak into child apps (#859).
 pub fn no_console(cmd: &mut Command) -> &mut Command {
-    cmd
+    cmd.env_remove("GDK_BACKEND")
+        .env_remove("GDK_DPI_SCALE")
+        .env_remove("GST_REGISTRY")
+        .env_remove("GST_REGISTRY_1_0")
+        .env_remove("GST_PLUGIN_SYSTEM_PATH")
+        .env_remove("GST_PLUGIN_SYSTEM_PATH_1_0")
 }
 
 pub fn open_url(url: &str) {
-    let _ = Command::new("xdg-open").arg(url).spawn();
+    let mut cmd = Command::new("xdg-open");
+    cmd.arg(url);
+    let _ = no_console(&mut cmd).spawn();
 }
 
 pub fn reveal_folder(path: &str) {
-    let _ = Command::new("xdg-open").arg(path).spawn();
+    let mut cmd = Command::new("xdg-open");
+    cmd.arg(path);
+    let _ = no_console(&mut cmd).spawn();
 }
 
 /// Our own `which`: the first executable file named `stem` on $PATH.
@@ -937,4 +948,28 @@ fn apply_rects(gw: &impl IsA<gtk::Widget>, rects: &[(f64, f64, f64, f64)]) {
         ));
     }
     gdk_window.input_shape_combine_region(&region, 0, 0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_console_strips_gtk_and_gstreamer_leakage() {
+        let mut cmd = Command::new("true");
+        cmd.env("GDK_BACKEND", "x11")
+            .env("GDK_DPI_SCALE", "0.8")
+            .env("GST_REGISTRY", "/tmp/reg")
+            .env("GST_REGISTRY_1_0", "/tmp/reg1")
+            .env("GST_PLUGIN_SYSTEM_PATH", "/tmp/sys")
+            .env("GST_PLUGIN_SYSTEM_PATH_1_0", "/tmp/sys1");
+        no_console(&mut cmd);
+        let envs: std::collections::HashMap<_, _> = cmd.get_envs().collect();
+        assert_eq!(envs.get(std::ffi::OsStr::new("GDK_BACKEND")), Some(&None));
+        assert_eq!(envs.get(std::ffi::OsStr::new("GDK_DPI_SCALE")), Some(&None));
+        assert_eq!(envs.get(std::ffi::OsStr::new("GST_REGISTRY")), Some(&None));
+        assert_eq!(envs.get(std::ffi::OsStr::new("GST_REGISTRY_1_0")), Some(&None));
+        assert_eq!(envs.get(std::ffi::OsStr::new("GST_PLUGIN_SYSTEM_PATH")), Some(&None));
+        assert_eq!(envs.get(std::ffi::OsStr::new("GST_PLUGIN_SYSTEM_PATH_1_0")), Some(&None));
+    }
 }
