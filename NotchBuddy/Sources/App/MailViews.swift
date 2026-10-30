@@ -128,7 +128,8 @@ struct MailCardView: View {
             // Message rows: three in view, the rest a scroll away.
             if mail.displayed.isEmpty {
                 Group {
-                    if mail.results != nil { Text("mail.no-results") }
+                    if mail.results != nil && mail.searching { Text("mail.searching") }
+                    else if mail.results != nil { Text("mail.no-results") }
                     else if mail.loaded { Text("No messages") } else { Text("Loading…") }
                 }
                     .font(.system(size: 11))
