@@ -285,7 +285,7 @@ struct HubMailRulesPage: View {
 
             HubCard {
                 if store.settings.rules.isEmpty {
-                    HubEmptyState(text: String(localized: "hub.mail.rules-empty"), state: .idle, color: mailBlue)
+                    HubEmptyState(text: String(localized: "hub.mail.rules-empty"), state: .idle, color: "#34D399")
                 } else {
                     ForEach(Array(store.settings.rules.enumerated()), id: \.element.id) { i, rule in
                         if i > 0 { HubDivider() }
@@ -342,7 +342,7 @@ struct HubMailBannedPage: View {
                         .disabled(word.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 if store.settings.banned.isEmpty {
-                    HubEmptyState(text: String(localized: "hub.mail.banned-empty"), state: .idle, color: mailBlue)
+                    HubEmptyState(text: String(localized: "hub.mail.banned-empty"), state: .idle, color: "#FF453A")
                 } else {
                     HubWrap(spacing: 8) {
                         ForEach(store.settings.banned, id: \.self) { w in
