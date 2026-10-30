@@ -1082,6 +1082,21 @@
    "ko": "자동화가 허용되지 않았어요",
    "ja": "オートメーションが許可されていません"
   },
+  "Back": {
+   "zh-Hans": "返回",
+   "hi": "वापस",
+   "es": "Atrás",
+   "ar": "رجوع",
+   "fr": "Retour",
+   "bn": "ফিরে যান",
+   "pt-BR": "Voltar",
+   "ru": "Назад",
+   "id": "Kembali",
+   "de": "Zurück",
+   "tr": "Geri",
+   "ko": "뒤로",
+   "ja": "戻る"
+  },
   "Banned words": {
    "zh-Hans": "屏蔽词",
    "hi": "प्रतिबंधित शब्द",
@@ -4786,6 +4801,21 @@
    "tr": "Posta",
    "ko": "메일",
    "ja": "メール"
+  },
+  "Mail didn’t give the text of this message. Open it in Mail to read it.": {
+   "zh-Hans": "“邮件”没有提供这封邮件的正文。请在“邮件”中打开阅读。",
+   "hi": "Mail ने इस संदेश का टेक्स्ट नहीं दिया। पढ़ने के लिए इसे Mail में खोलें।",
+   "es": "Mail no ha dado el texto de este mensaje. Ábrelo en Mail para leerlo.",
+   "ar": "لم يقدّم تطبيق Mail نص هذه الرسالة. افتحها في Mail لقراءتها.",
+   "fr": "Mail n’a pas donné le texte de ce message. Ouvre-le dans Mail pour le lire.",
+   "bn": "Mail এই বার্তার লেখা দেয়নি। পড়তে Mail-এ খুলুন।",
+   "pt-BR": "O Mail não entregou o texto desta mensagem. Abra no Mail para ler.",
+   "ru": "Mail не передал текст этого письма. Откройте его в Mail, чтобы прочитать.",
+   "id": "Mail tidak memberikan teks pesan ini. Buka di Mail untuk membacanya.",
+   "de": "Mail hat den Text dieser Nachricht nicht geliefert. Öffne sie in Mail, um sie zu lesen.",
+   "tr": "Mail bu iletinin metnini vermedi. Okumak için Mail’de aç.",
+   "ko": "Mail에서 이 메시지의 본문을 가져오지 못했어요. Mail에서 열어 읽어 보세요.",
+   "ja": "Mail からこのメッセージの本文を取得できませんでした。Mail で開いて読んでください。"
   },
   "Mail is closed": {
    "zh-Hans": "“邮件”未打开",
@@ -9737,6 +9767,21 @@
    "ko": "그러면",
    "ja": "実行"
   },
+  "This message has no text.": {
+   "zh-Hans": "这封邮件没有正文。",
+   "hi": "इस संदेश में कोई टेक्स्ट नहीं है।",
+   "es": "Este mensaje no tiene texto.",
+   "ar": "لا يحتوي هذا البريد على نص.",
+   "fr": "Ce message n’a pas de texte.",
+   "bn": "এই বার্তায় কোনো লেখা নেই।",
+   "pt-BR": "Esta mensagem não tem texto.",
+   "ru": "В этом письме нет текста.",
+   "id": "Pesan ini tidak berisi teks.",
+   "de": "Diese Nachricht hat keinen Text.",
+   "tr": "Bu iletide metin yok.",
+   "ko": "이 메시지에는 본문이 없어요.",
+   "ja": "このメッセージには本文がありません。"
+  },
   "This model is not available.": {
    "zh-Hans": "此模型不可用。",
    "hi": "यह मॉडल उपलब्ध नहीं है।",
@@ -11896,6 +11941,21 @@
    "tr": "{0} dk",
    "ko": "{0}분",
    "ja": "{0} 分"
+  },
+  "{0} new messages checked today. None matched a VIP, a banned word or a rule, so Coucou left them as they are.": {
+   "zh-Hans": "今天检查了 {0} 封新邮件。没有一封匹配 VIP、屏蔽词或规则，所以 Coucou 保持原样。",
+   "hi": "आज {0} नए संदेश जाँचे गए। कोई भी VIP, प्रतिबंधित शब्द या नियम से मेल नहीं खाया, इसलिए Coucou ने उन्हें वैसे ही छोड़ दिया।",
+   "es": "{0} mensajes nuevos revisados hoy. Ninguno coincidía con un VIP, una palabra prohibida o una regla, así que Coucou los dejó como estaban.",
+   "ar": "تم فحص {0} رسالة جديدة اليوم. لم تطابق أيٌّ منها شخصًا مهمًا أو كلمة محظورة أو قاعدة، لذا تركها Coucou كما هي.",
+   "fr": "{0} nouveaux messages vérifiés aujourd’hui. Aucun ne correspondait à un VIP, un mot banni ou une règle : Coucou les a laissés tels quels.",
+   "bn": "আজ {0} টি নতুন বার্তা দেখা হয়েছে। কোনোটি VIP, নিষিদ্ধ শব্দ বা নিয়মের সাথে মেলেনি, তাই Coucou সেগুলো যেমন ছিল তেমনই রেখেছে।",
+   "pt-BR": "{0} mensagens novas verificadas hoje. Nenhuma correspondia a um VIP, uma palavra banida ou uma regra, então o Coucou as deixou como estavam.",
+   "ru": "Сегодня проверено новых писем: {0}. Ни одно не совпало с VIP, запрещённым словом или правилом, поэтому Coucou оставил их как есть.",
+   "id": "{0} pesan baru diperiksa hari ini. Tidak ada yang cocok dengan VIP, kata terlarang, atau aturan, jadi Coucou membiarkannya apa adanya.",
+   "de": "Heute {0} neue Nachrichten geprüft. Keine passte zu einem VIP, einem gesperrten Wort oder einer Regel, also hat Coucou sie gelassen, wie sie sind.",
+   "tr": "Bugün {0} yeni ileti kontrol edildi. Hiçbiri bir VIP, yasaklı kelime veya kuralla eşleşmedi, bu yüzden Coucou onları olduğu gibi bıraktı.",
+   "ko": "오늘 새 메시지 {0}개를 확인했어요. VIP, 금지어, 규칙 중 어느 것에도 해당하지 않아 Coucou는 그대로 두었어요.",
+   "ja": "今日は新着メッセージを {0} 件確認しました。VIP、禁止ワード、ルールのどれにも当てはまらなかったので、Coucou はそのままにしました。"
   },
   "{0} removed": {
    "zh-Hans": "已移除 {0}",

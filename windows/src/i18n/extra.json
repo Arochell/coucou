@@ -226,21 +226,6 @@
       "ko": "자동 닫기",
       "ja": "自動で閉じる"
     },
-    "Back": {
-      "zh-Hans": "返回",
-      "hi": "वापस",
-      "es": "Atrás",
-      "ar": "رجوع",
-      "fr": "Retour",
-      "bn": "ফিরে যান",
-      "pt-BR": "Voltar",
-      "ru": "Назад",
-      "id": "Kembali",
-      "de": "Zurück",
-      "tr": "Geri",
-      "ko": "뒤로",
-      "ja": "戻る"
-    },
     "Back up and remove": {
       "zh-Hans": "备份并移除",
       "hi": "बैकअप लें और हटाएँ",

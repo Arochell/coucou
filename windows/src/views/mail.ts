@@ -184,12 +184,18 @@ export function buildMailCard(host: MailCardHost): MailCard {
     clear(head);
     head.append(dot(MAIL_BLUE, 7), h("b", { text: "Outlook" }));
     if (searchOpen) {
-      head.append(field, closeSearch);
+      head.append(field);
+      if (searching) head.append(h("span", { class: "mail-spinner" }));
+      head.append(closeSearch);
     } else {
       head.append(h("span", { text: t("Inbox") }));
-      unreadTag.textContent = d.unread > 0 ? t("{0} unread", { 0: d.unread }) : "";
+      // Just the number, on one line (the sentence on hover).
+      unreadTag.textContent = d.unread > 9999 ? "9999+" : String(d.unread);
+      unreadTag.title = t("{0} unread", { 0: d.unread });
       unreadTag.style.display = d.unread > 0 ? "" : "none";
-      head.append(unreadTag, h("span", { class: "mail-spacer" }), searchBtn);
+      head.append(unreadTag, h("span", { class: "mail-spacer" }));
+      if (searching) head.append(h("span", { class: "mail-spinner" }));
+      head.append(searchBtn);
     }
 
     clear(filters);
@@ -203,7 +209,6 @@ export function buildMailCard(host: MailCardHost): MailCard {
         },
       }));
     }
-    if (searching) filters.append(h("span", { class: "mail-searching", text: t("Searching…") }));
     filters.style.display = d.running ? "" : "none";
 
     clear(listBody);

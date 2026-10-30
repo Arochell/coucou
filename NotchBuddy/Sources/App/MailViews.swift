@@ -34,6 +34,16 @@ struct MailCardView: View {
             }
         }
         .onAppear { mail.refreshIfStale() }
+        // A mail open: the notch grows so it can be read; back to the list, it shrinks.
+        .onChange(of: openId) { _, id in setReading(id != nil) }
+        .onDisappear { setReading(false) }
+    }
+
+    private func setReading(_ on: Bool) {
+        let h: CGFloat? = on ? MailLayout.readingHeight : nil
+        guard MailLayout.detailHeight != h else { return }
+        MailLayout.detailHeight = h
+        NotificationCenter.default.post(name: .islandResize, object: nil)
     }
 
     private var list: some View {
@@ -57,6 +67,7 @@ struct MailCardView: View {
                         .foregroundColor(Color(hex: "#E8E9EC"))
                         .focused($searchFocused)
                         .onSubmit { mail.runSearch() }
+                    if mail.searching { MailSpinner() }
                     Button {
                         withAnimation(.easeOut(duration: 0.15)) { searchOpen = false }
                         mail.clearSearch()
@@ -69,15 +80,20 @@ struct MailCardView: View {
                     .help(String(localized: "Close"))
                 } else {
                     if let unread = mail.unreadCount, unread > 0 {
-                        Text(String(format: String(localized: "%lld unread"), Int64(unread)))
+                        // Just the number, on one line: "1308" (the whole sentence in the tooltip).
+                        Text(verbatim: unread > 9999 ? "9999+" : String(unread))
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(Color(hex: mailAccent))
                             .monospacedDigit()
+                            .lineLimit(1)
+                            .fixedSize()
                             .padding(.horizontal, 6).padding(.vertical, 1)
                             .background(Color(hex: mailAccent).opacity(0.14))
                             .clipShape(Capsule())
+                            .help(String(format: String(localized: "%lld unread"), Int64(unread)))
                     }
                     Spacer(minLength: 2)
+                    if mail.searching { MailSpinner() }
                     Button {
                         withAnimation(.easeOut(duration: 0.15)) { searchOpen = true }
                         searchFocused = true
@@ -97,17 +113,13 @@ struct MailCardView: View {
             .padding(.trailing, 36)
 
             // Quick filters: All, Unread, Important, Today.
-            HStack(spacing: 4) {
-                ForEach(MailFilter.allCases, id: \.self) { f in
-                    MailFilterChip(title: f.title, on: mail.filter == f) { mail.setFilter(f) }
+            // One line whatever the language: a longer set scrolls sideways, never wraps.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 3) {
+                    ForEach(MailFilter.allCases, id: \.self) { f in
+                        MailFilterChip(title: f.title, on: mail.filter == f) { mail.setFilter(f) }
+                    }
                 }
-                if mail.searching {
-                    Text("mail.searching")
-                        .font(.system(size: 9.5))
-                        .foregroundColor(Color(hex: "#6B7079"))
-                        .padding(.leading, 4)
-                }
-                Spacer(minLength: 0)
             }
             .padding(.top, 4)
             .padding(.leading, 108)
@@ -216,8 +228,10 @@ private struct MailFilterChip: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 9.5, weight: on ? .semibold : .regular))
+                .lineLimit(1)
+                .fixedSize()
                 .foregroundColor(Color(hex: on ? "#E8E9EC" : (hovered ? "#B0B5BE" : "#6B7079")))
-                .padding(.horizontal, 7).padding(.vertical, 2)
+                .padding(.horizontal, 6).padding(.vertical, 2)
                 .background(Capsule().fill(on ? Color(hex: mailAccent).opacity(0.22) : Color.white.opacity(hovered ? 0.06 : 0)))
                 .contentShape(Capsule())
         }
@@ -239,7 +253,18 @@ extension MailFilter {
 
 // MARK: - Mail detail
 
-/// One message opened in the card: sender, subject, the start of its text, and actions.
+/// The small turning circle of a search in progress (in the header: the filters keep their line).
+private struct MailSpinner: View {
+    var body: some View {
+        ProgressView()
+            .controlSize(.mini)
+            .scaleEffect(0.7)
+            .frame(width: 12, height: 12)
+    }
+}
+
+/// One message opened in the card: sender, subject, its text (the notch grows to read it,
+/// MailLayout) and the actions in one row of icons, each with its name on hover.
 struct MailDetailView: View {
     let message: MailMessage
     let onClose: () -> Void
@@ -247,7 +272,7 @@ struct MailDetailView: View {
 
     var body: some View {
         let accent = Color(hex: mailAccent)
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 5) {
             // Header: back, sender, age
             HStack(spacing: 6) {
                 Button(action: onClose) {
@@ -258,6 +283,7 @@ struct MailDetailView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .help(String(localized: "Back"))
 
                 Circle()
                     .fill(message.isRead ? Color(hex: "#4D5159") : accent)
@@ -268,6 +294,11 @@ struct MailDetailView: View {
                     .lineLimit(1).truncationMode(.tail)
                     .layoutPriority(1)
                     .help(message.senderAddress)
+                if message.isFlagged {
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: 8))
+                        .foregroundColor(Color(hex: "#F5A524"))
+                }
                 Spacer(minLength: 2)
                 Text(message.timeAgo)
                     .font(.system(size: 10))
@@ -281,43 +312,61 @@ struct MailDetailView: View {
             Text(message.subject.isEmpty ? " " : message.subject)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(Color(hex: "#C5C8CD"))
-                .lineLimit(1).truncationMode(.tail)
+                .lineLimit(2).truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
 
-            // The start of the message, scrollable.
+            // The text, scrollable, in all the room left.
             ScrollView(.vertical, showsIndicators: false) {
                 Group {
                     if let text = mail.previews[message.id] {
-                        Text(text.isEmpty ? " " : text)
+                        Text(text.isEmpty ? String(localized: "mail.preview-empty") : text)
+                    } else if mail.previewFailed.contains(message.id) {
+                        Text("mail.preview-failed")
                     } else {
-                        Text("Loading…")
+                        HStack(spacing: 6) {
+                            MailSpinner()
+                            Text("Loading…")
+                        }
                     }
                 }
                 .font(.system(size: 10.5))
                 .foregroundColor(Color(hex: "#9398A1"))
+                .lineSpacing(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
             }
-            .frame(height: 28)
+            .frame(maxHeight: .infinity)
 
             // Actions: each one is the user's own click. Nothing is ever sent from here.
-            HStack(spacing: 12) {
-                Button("Open in Mail") { mail.openInMail(message) }
-                    .foregroundColor(accent.opacity(0.9))
-                Button("Reply") { mail.reply(message) }
-                    .foregroundColor(Color(hex: "#C5C8CD"))
-                if !message.isRead {
-                    Button("Mark as read") { mail.markAsRead(message) }
-                        .foregroundColor(Color(hex: "#8E939C"))
+            HStack(spacing: 4) {
+                Button { mail.openInMail(message) } label: {
+                    Text("mail.open")
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundColor(accent)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Capsule().fill(accent.opacity(0.16)))
                 }
-                Button(message.isFlagged ? String(localized: "mail.not-important") : String(localized: "mail.important")) {
+                .help(String(localized: "Open in Mail"))
+                Spacer(minLength: 4)
+                MailIconButton(symbol: "arrowshape.turn.up.left", help: String(localized: "Reply")) {
+                    mail.reply(message)
+                }
+                if !message.isRead {
+                    MailIconButton(symbol: "envelope.open", help: String(localized: "Mark as read")) {
+                        mail.markAsRead(message)
+                    }
+                }
+                MailIconButton(symbol: message.isFlagged ? "flag.slash" : "flag",
+                               help: message.isFlagged ? String(localized: "mail.not-important") : String(localized: "mail.important"),
+                               tint: "#F5A524") {
                     mail.toggleFlag(message)
                 }
-                .foregroundColor(Color(hex: "#F5A524").opacity(0.9))
-                Button(String(localized: "mail.junk")) {
+                MailIconButton(symbol: "xmark.bin", help: String(localized: "mail.junk")) {
                     mail.moveToJunk(message)
                     onClose()
                 }
-                .foregroundColor(Color(hex: "#8E939C"))
                 Menu {
                     Button(String(localized: "mail.make-vip")) { mail.makeVIP(message) }
                     Button(String(localized: "mail.ignore-sender")) {
@@ -328,13 +377,14 @@ struct MailDetailView: View {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Color(hex: "#8E939C"))
+                        .frame(width: 22, height: 20)
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
             }
-            .font(.system(size: 11, weight: .medium))
             .buttonStyle(.plain)
+            .padding(.bottom, 8)
         }
         .padding(.top, 4)
         .padding(.leading, 108)
@@ -342,6 +392,29 @@ struct MailDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .contentShape(Rectangle())
         .onAppear { mail.loadPreview(message) }
+    }
+}
+
+/// An action of the open mail: an icon, its name on hover.
+private struct MailIconButton: View {
+    let symbol: String
+    let help: String
+    var tint: String = "#B0B5BE"
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Color(hex: tint).opacity(hovered ? 1 : 0.8))
+                .frame(width: 24, height: 20)
+                .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(hovered ? 0.08 : 0)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .onHover { hovered = $0 }
     }
 }
 #endif

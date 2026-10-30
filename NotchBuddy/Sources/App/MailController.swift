@@ -74,6 +74,8 @@ final class MailController: ObservableObject {
     @Published private(set) var automationDenied = false
     /// Text of the messages opened in the card, by message id.
     @Published private(set) var previews: [String: String] = [:]
+    /// Messages Mail didn't give the text of (in time): the card says so instead of "Loading…".
+    @Published private(set) var previewFailed: Set<String> = []
 
     /// How many messages are kept for the card (the newest across all inboxes).
     nonisolated static let keep = 12
@@ -268,6 +270,7 @@ final class MailController: ObservableObject {
         let fresh = list.filter { $0.date >= since && !store.isSeen($0.id) }.sorted { $0.date < $1.date }
         guard !fresh.isEmpty else { return }
         store.markSeen(fresh.map(\.id))
+        store.countChecked(fresh.count)
         let needsText = MailTriage.needsText(settings)
         for message in fresh {
             var facts = MailFacts(sender: message.sender, subject: message.subject, account: message.account)
@@ -340,16 +343,19 @@ final class MailController: ObservableObject {
 
     // MARK: - Actions (each one follows a click)
 
-    /// The message's text (first 1,200 characters), read once and cached.
+    /// The message's text (first 4,000 characters), read once and cached. Mail may have to
+    /// download it: 20 seconds at most, then the card says it couldn't.
     func loadPreview(_ message: MailMessage) {
         guard previews[message.id] == nil, Self.mailRunning() else { return }
+        previewFailed.remove(message.id)
         Task {
             let script = Self.messageScript(message, body: """
                 set c to ""
-                try
+                with timeout of 20 seconds
                     set c to content of m
-                end try
-                if (length of c) > 1200 then set c to text 1 thru 1200 of c
+                end timeout
+                if c is missing value then set c to ""
+                if (length of c) > 4000 then set c to text 1 thru 4000 of c
                 return c
                 """)
             let result = await runAppleScript(script)
@@ -361,7 +367,7 @@ final class MailController: ObservableObject {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 previews[message.id] = text
             } else {
-                previews[message.id] = ""
+                previewFailed.insert(message.id)
             }
         }
     }

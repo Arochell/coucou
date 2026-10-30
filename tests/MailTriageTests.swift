@@ -103,6 +103,8 @@ enum MailTriageTests {
         precondition(sc.contains("id of (every message of mb whose read status is false)"))
         precondition(sc.contains("flagged status of (every message of mb whose read status is false)"))
         precondition(!sc.contains("set d0"))
+        precondition(sc.contains("if c > 60 then") && sc.contains("repeat with i from a to b"), "the newest 60 at most")
+        precondition(MailScript.searchScript(whose: "read status is false", today: false, limit: 5).contains("set a to c - 5 + 1"))
         precondition(MailScript.searchScript(whose: "date received > d0", today: true).contains(MailScript.todayPrelude))
     }
 }
