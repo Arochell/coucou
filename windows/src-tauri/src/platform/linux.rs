@@ -909,10 +909,13 @@ pub fn prepare_pill_window(win: &WebviewWindow, mode: super::DesktopMode) -> boo
 pub fn set_pill_edge(win: &WebviewWindow, edge: &str) {
     let Ok(gw) = win.gtk_window() else { return };
     let ptr = gtk_window_ptr(&gw);
+    let bottom = edge == "bottom" || edge == "bottom-left" || edge == "bottom-right";
+    let left = edge == "left" || edge == "bottom-left";
+    let right = edge == "right" || edge == "bottom-right";
     unsafe {
-        layer::gtk_layer_set_anchor(ptr, layer::EDGE_BOTTOM, (edge == "bottom") as i32);
-        layer::gtk_layer_set_anchor(ptr, layer::EDGE_LEFT, (edge == "left") as i32);
-        layer::gtk_layer_set_anchor(ptr, layer::EDGE_RIGHT, (edge == "right") as i32);
+        layer::gtk_layer_set_anchor(ptr, layer::EDGE_BOTTOM, bottom as i32);
+        layer::gtk_layer_set_anchor(ptr, layer::EDGE_LEFT, left as i32);
+        layer::gtk_layer_set_anchor(ptr, layer::EDGE_RIGHT, right as i32);
         layer::gtk_layer_set_anchor(ptr, layer::EDGE_TOP, 0);
     }
 }

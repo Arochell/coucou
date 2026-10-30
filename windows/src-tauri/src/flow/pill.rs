@@ -207,16 +207,18 @@ fn window(app: &AppHandle) -> Option<WebviewWindow> {
 }
 
 fn size_for(edge: &str) -> (f64, f64) {
-    if edge == "bottom" {
-        BOTTOM
-    } else {
+    if edge == "left" || edge == "right" {
         SIDE
+    } else {
+        BOTTOM
     }
 }
 
 pub fn edge_name(edge: Edge) -> &'static str {
     match edge {
         Edge::Bottom => "bottom",
+        Edge::BottomLeft => "bottom-left",
+        Edge::BottomRight => "bottom-right",
         Edge::Left => "left",
         Edge::Right => "right",
     }
@@ -301,6 +303,8 @@ fn place(app: &AppHandle, pill: &Pill, edge: &str, on_cursor: bool) {
             let (x, y) = match edge {
                 "left" => (ax + gap, ay + (ah - ph) / 2),
                 "right" => (ax + aw - pw - gap, ay + (ah - ph) / 2),
+                "bottom-left" => (ax + gap, ay + ah - ph - gap),
+                "bottom-right" => (ax + aw - pw - gap, ay + ah - ph - gap),
                 _ => (ax + (aw - pw) / 2, ay + ah - ph - gap),
             };
             #[cfg(target_os = "linux")]
@@ -403,4 +407,24 @@ pub fn rest_after(app: &AppHandle, phase: &str, ms: u64) {
             }
         });
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn edge_names_and_sizes_match_expected() {
+        assert_eq!(edge_name(Edge::Bottom), "bottom");
+        assert_eq!(edge_name(Edge::BottomLeft), "bottom-left");
+        assert_eq!(edge_name(Edge::BottomRight), "bottom-right");
+        assert_eq!(edge_name(Edge::Left), "left");
+        assert_eq!(edge_name(Edge::Right), "right");
+
+        assert_eq!(size_for("bottom"), BOTTOM);
+        assert_eq!(size_for("bottom-left"), BOTTOM);
+        assert_eq!(size_for("bottom-right"), BOTTOM);
+        assert_eq!(size_for("left"), SIDE);
+        assert_eq!(size_for("right"), SIDE);
+    }
 }
