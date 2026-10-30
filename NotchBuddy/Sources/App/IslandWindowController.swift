@@ -196,6 +196,8 @@ final class IslandWindowController: NSWindowController {
                 guard let self else { return }
                 if newView == .prompt {
                     self.islandPanel.makeKey()
+                } else if self.islandPanel.isKeyWindow {
+                    self.islandPanel.resignKey()
                 }
             }
 
@@ -1433,7 +1435,10 @@ final class IslandPanel: NSPanel {
     var notchWidth:  CGFloat = IslandConst.notchWidth
     var notchHeight: CGFloat = IslandConst.notchHeight
 
-    override var canBecomeKey:  Bool { true }
+    override var canBecomeKey:  Bool {
+        let s = AppState.shared
+        return s.mode == .expanded && (s.view == .prompt || s.view == .question)
+    }
     override var canBecomeMain: Bool { false }
 
     /// Allow panel to sit in the menu bar / notch area — don't let macOS push it down.
