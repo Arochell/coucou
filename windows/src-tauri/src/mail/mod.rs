@@ -46,6 +46,14 @@ pub static MAIL_TURN: AtomicBool = AtomicBool::new(false);
 static BUSY: AtomicBool = AtomicBool::new(false);
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
+struct BusyGuard<'a>(&'a AtomicBool);
+
+impl<'a> Drop for BusyGuard<'a> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
 struct Runtime {
     store: Store,
     shown: usize,
@@ -152,9 +160,10 @@ pub async fn poll(app: &AppHandle) {
     if BUSY.swap(true, Ordering::AcqRel) {
         return;
     }
+    let _busy_guard = BusyGuard(&BUSY);
     let per_inbox = { rt().shown.max(if auto { 30 } else { 0 }) };
     let result = outlook::run(outlook::list_script(per_inbox), TIMEOUT).await;
-    BUSY.store(false, Ordering::Release);
+    drop(_busy_guard);
     match result {
         Ok(v) => {
             let listing: outlook::Listing = serde_json::from_value(v).unwrap_or_default();
