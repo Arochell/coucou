@@ -329,6 +329,11 @@ mod zoom_tests {
         assert_eq!(calculate_zoom_correction(1.0, f64::NAN, 1.0), None);
         assert_eq!(calculate_zoom_correction(1.0, 1.0, f64::INFINITY), None);
     }
+
+    #[test]
+    fn top_taskbar_offset_defaults_safely() {
+        assert!(platform::top_taskbar_offset(0, 0, 1920, 1080) >= 0);
+    }
 }
 
 
@@ -363,7 +368,8 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
     let pw = (lw * scale).round().max(1.0) as u32;
     let ph = (lh * scale).round().max(1.0) as u32;
     let x = mp.x + (ms.width as i32 - pw as i32) / 2;
-    let y = mp.y;
+    let top_offset = platform::top_taskbar_offset(mp.x, mp.y, ms.width, ms.height);
+    let y = mp.y + top_offset;
 
     // GTK never sizes a non-resizable window below its natural size (200 px
     // here), so on Linux the 6 px wake strip would stay a 200 px block. tao
@@ -404,7 +410,8 @@ fn current_screen_key(app: &AppHandle) -> Option<(i32, i32, u32, u32, u64)> {
     let m = target_monitor(app, &pref)?;
     let p = m.position();
     let size = m.size();
-    Some((p.x, p.y, size.width, size.height, m.scale_factor().to_bits()))
+    let top = platform::top_taskbar_offset(p.x, p.y, size.width, size.height);
+    Some((p.x, p.y + top, size.width, size.height, m.scale_factor().to_bits()))
 }
 
 /// Emits `cursor` (window-logical coordinates) at ~60 Hz while the island is

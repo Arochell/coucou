@@ -534,6 +534,11 @@ pub fn pin_to_monitor(win: &WebviewWindow, x: i32, y: i32) {
     unsafe { layer::gtk_layer_set_monitor(gtk_window_ptr(&gw), mon_ptr) };
 }
 
+/// Top taskbars only dock on Windows (layer-shell on Linux anchors to screen edge).
+pub fn top_taskbar_offset(_mx: i32, _my: i32, _mw: u32, _mh: u32) -> i32 {
+    0
+}
+
 /// Temporarily allow keyboard focus so a text field inside the island can be
 /// typed in.
 pub fn set_activating(win: &WebviewWindow, activating: bool) {
