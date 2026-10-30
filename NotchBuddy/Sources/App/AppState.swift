@@ -357,6 +357,9 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(Int(hotkeyCode), forKey: "hotkeyCode") }
     }
 
+    /// Two Mochis swapping places in a corner (CornerArcView draws both): the main one hides.
+    @Published var cornerSwapping = false
+
     /// Where the island lives on its screen: the notch, or a corner (IslandPlacement) — persisted.
     @Published var islandPlacement: IslandPlacement = .notch {
         didSet {

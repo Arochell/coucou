@@ -13,11 +13,24 @@ struct CornerArcView: View {
     /// The circle's order, kept across swaps (the one leaving the corner takes the place of the
     /// one arriving), new pills added at the end.
     @State private var order: [String] = []
-    /// The Mochi flying to the corner, during the swap.
-    @State private var flying: String? = nil
+    /// Two Mochis swapping places: the one arriving in the corner and the one leaving it.
+    @State private var swap: Swap? = nil
+    @State private var swapT: CGFloat = 0
+
+    private struct Swap: Equatable {
+        let incoming: AgentTask
+        let outgoing: AgentTask
+        let slot: Int
+        let order: [String]
+        static func == (a: Swap, b: Swap) -> Bool { a.incoming.id == b.incoming.id && a.slot == b.slot }
+    }
 
     /// Room for five around Mochi; the others are a tap on the circle away once one leaves it.
     static let maxShown = 5
+    /// Mochi's size in the corner, and on the circle (the swap grows one and shrinks the other).
+    static let bigBody: CGFloat = 58
+    static let smallBody: CGFloat = 24
+    static let swapDuration: Double = 0.55
 
     private var arcTasks: [AgentTask] {
         let focus = state.focusTask?.id
@@ -46,35 +59,92 @@ struct CornerArcView: View {
             .allowsHitTesting(false)
 
             ForEach(Array(tasks.enumerated()), id: \.element.id) { i, task in
-                let isFlying = flying == task.id
-                CornerMini(task: task) { swap(to: task, at: i, current: tasks) }
-                    .scaleEffect(isFlying ? 1.45 : 1)
-                    .opacity(isFlying ? 0 : 1)
-                    .position(isFlying ? home : (i < points.count ? points[i] : home))
-                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+                let leaving = swap?.incoming.id == task.id
+                CornerMini(task: task) { start(task, at: i, current: tasks) }
+                    // Its Mochi is on its way to the corner (drawn below): the button stays empty.
+                    .opacity(leaving ? 0 : 1)
+                    .position(i < points.count ? points[i] : home)
+                    .transition(.opacity)
+            }
+
+            // The swap: each one on its own curve, crossing the other halfway.
+            if let s = swap, s.slot < points.count {
+                let slot = points[s.slot]
+                let small = Self.smallBody / Self.bigBody
+                MiniBotCanvasView(task: s.outgoing)
+                    .frame(width: Self.bigBody / 0.6, height: Self.bigBody / 0.6)
+                    .modifier(CurveMove(t: swapT, from: home, to: slot, bulge: 46,
+                                        fromScale: 1, toScale: small))
+                    .allowsHitTesting(false)
+                MiniBotCanvasView(task: s.incoming)
+                    .frame(width: Self.bigBody / 0.6, height: Self.bigBody / 0.6)
+                    .modifier(CurveMove(t: swapT, from: slot, to: home, bulge: 46,
+                                        fromScale: small, toScale: 1))
+                    .allowsHitTesting(false)
             }
         }
         .frame(width: islandW, height: islandH, alignment: .topLeading)
-        .clipped()
-        .animation(.spring(response: 0.42, dampingFraction: 0.78), value: tasks.map(\.id))
-        .animation(.spring(response: 0.26, dampingFraction: 0.85), value: flying)
+        .animation(.spring(response: 0.42, dampingFraction: 0.8), value: tasks.map(\.id))
+        .onDisappear { if swap != nil { finish() } }
     }
 
-    private func swap(to task: AgentTask, at index: Int, current: [AgentTask]) {
-        guard flying == nil else { return }
+    private func start(_ task: AgentTask, at index: Int, current: [AgentTask]) {
+        guard swap == nil, let focus = state.focusTask else { return }
         var ids = current.map(\.id)
-        if let focus = state.focusTask?.id, index < ids.count { ids[index] = focus }
-        flying = task.id
+        if index < ids.count { ids[index] = focus.id }
+        swap = Swap(incoming: task, outgoing: focus, slot: index, order: ids)
+        swapT = 0
+        state.cornerSwapping = true
         SoundEngine.shared.play("blip")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            order = ids
-            state.setFocus(task.id)
-            flying = nil
+        withAnimation(.timingCurve(0.5, 0, 0.25, 1, duration: Self.swapDuration)) { swapT = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.swapDuration) { finish() }
+    }
+
+    /// Both have arrived: the one in the corner is now the focus, the other is on the circle.
+    private func finish() {
+        guard let s = swap else { return }
+        var tr = Transaction()
+        tr.disablesAnimations = true
+        withTransaction(tr) {
+            order = s.order
+            state.setFocus(s.incoming.id)
+            state.cornerSwapping = false
+            swap = nil
+            swapT = 0
         }
     }
 }
 
-/// One pill's Mochi on the circle: a round button in its colour, its name on hover.
+/// Moves a view along a curve from `from` to `to` (a quadratic curve bowed `bulge` points to the
+/// side), resizing it on the way. Two of them with the same bulge, in opposite directions, cross.
+private struct CurveMove: ViewModifier, Animatable {
+    var t: CGFloat
+    let from: CGPoint
+    let to: CGPoint
+    let bulge: CGFloat
+    let fromScale: CGFloat
+    let toScale: CGFloat
+
+    var animatableData: CGFloat {
+        get { t }
+        set { t = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        let dx = to.x - from.x, dy = to.y - from.y
+        let len = max(1, hypot(dx, dy))
+        let mid = CGPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
+        let ctrl = CGPoint(x: mid.x - dy / len * bulge, y: mid.y + dx / len * bulge)
+        let u = 1 - t
+        let p = CGPoint(x: u * u * from.x + 2 * u * t * ctrl.x + t * t * to.x,
+                        y: u * u * from.y + 2 * u * t * ctrl.y + t * t * to.y)
+        return content
+            .scaleEffect(fromScale + (toScale - fromScale) * t)
+            .position(p)
+    }
+}
+
+/// One pill's Mochi on the circle: a round button in its colour, its name under it.
 private struct CornerMini: View {
     let task: AgentTask
     let onTap: () -> Void
@@ -93,8 +163,8 @@ private struct CornerMini: View {
                     Circle()
                         .stroke(Color(hex: task.color).opacity(hover ? 0.6 : 0.22), lineWidth: 1.2)
                     MiniBotCanvasView(task: task)
-                        .frame(width: 24 / 0.6, height: 24 / 0.6)
-                        .frame(width: 24, height: 24)
+                        .frame(width: CornerArcView.smallBody / 0.6, height: CornerArcView.smallBody / 0.6)
+                        .frame(width: CornerArcView.smallBody, height: CornerArcView.smallBody)
                 }
                 .frame(width: 40, height: 40)
                 .shadow(color: Color(hex: task.color).opacity(hover ? 0.35 : 0), radius: 10)
@@ -107,13 +177,10 @@ private struct CornerMini: View {
             .overlay(alignment: .bottom) {
                 Text(verbatim: name)
                     .font(.system(size: 9.5, weight: .semibold))
-                    .foregroundColor(Color(hex: task.color).lighter(by: 0.3))
+                    .foregroundColor(hover ? Color(hex: task.color).lighter(by: 0.3) : Color(hex: "#8E939C"))
                     .lineLimit(1)
                     .fixedSize()
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Capsule().fill(Color.black.opacity(0.85)))
-                    .offset(y: 18)
-                    .opacity(hover ? 1 : 0)
+                    .offset(y: 15)
                     .allowsHitTesting(false)
             }
         }

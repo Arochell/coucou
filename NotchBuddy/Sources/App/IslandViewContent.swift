@@ -202,7 +202,7 @@ struct OverviewView: View {
         let placement = state.islandPlacement
         let shift: CGFloat = 96
         return GeometryReader { geo in
-            let cardW = max(200, geo.size.width - 180)
+            let cardW = max(200, geo.size.width - IslandPlacement.cornerColumn)
             leftCard
                 .frame(width: cardW + shift, height: geo.size.height)
                 .offset(x: -shift)

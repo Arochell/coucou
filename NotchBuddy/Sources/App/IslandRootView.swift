@@ -118,6 +118,9 @@ struct IslandContainer: View {
                         .offset(y: earOffset)
                         .clipShape(IslandShape(width: islandWidth, height: islandHeight,
                                               cornerRadius: cornerRadius, topRadius: islandTopRadius))
+                        // In a corner, held by it while the island grows (no slide).
+                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                               alignment: state.islandPlacement.isCorner ? state.islandPlacement.alignment : .topLeading)
                         .transition(.opacity)
                 }
             }
@@ -126,12 +129,31 @@ struct IslandContainer: View {
             if state.mode == .expanded && state.view == .overview && state.islandPlacement.isCorner
                 && !uploadActive && !greetingActive {
                 CornerArcView(state: state, islandW: islandWidth, islandH: islandHeight)
+                    // Held by the island's corner while it grows.
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: state.islandPlacement.alignment)
                     .transition(.opacity)
             }
 
             // Single BotPlacement — always alive in the view tree so spring animations
             // fire from the current position (e.g. choose at 60,101) when canvas deactivates.
             // Hidden during upload canvas or greeting (both draw their own Mochi).
+            if state.islandPlacement.isCorner {
+                // Held by the island's corner, which stays put while the island grows from it:
+                // Mochi only moves between his own places (the tile's middle, the open corner).
+                let p = state.islandPlacement
+                let box: CGFloat = 300
+                BotPlacement(state: state, islandW: islandWidth, islandH: islandHeight,
+                             shift: CGSize(width: p.isRight ? islandWidth - box : 0,
+                                           height: p.isBottom ? islandHeight - box : 0))
+                    .frame(width: box, height: box)
+                    .mask(alignment: p.alignment) {
+                        Rectangle().frame(width: islandWidth,
+                                          height: state.mode == .expanded ? 320 : islandHeight)
+                    }
+                    .frame(width: islandWidth, height: islandHeight, alignment: p.alignment)
+                    .opacity(uploadActive || greetingActive ? 0 : 1)
+                    .animation(.easeInOut(duration: 0.25), value: uploadActive || greetingActive)
+            } else {
             BotPlacement(state: state, islandW: islandWidth, islandH: islandHeight)
                 // Keep idle animations inside the resting strip. Expanded views
                 // retain the panel's full height for particles and hands.
@@ -141,6 +163,7 @@ struct IslandContainer: View {
                 }
                 .opacity(uploadActive || greetingActive ? 0 : 1)
                 .animation(.easeInOut(duration: 0.25), value: uploadActive || greetingActive)
+            }
 
             CountdownBar(state: state, islandW: islandWidth)
 
@@ -178,7 +201,7 @@ struct IslandContainer: View {
             let (w, h) = islandSize(mode: newMode, view: state.view,
                                     progress: state.uploadProgress,
                                     nw: state.notchWidth, nh: state.notchHeight)
-            let cr  = newMode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
+            let cr  = islandCorner(newMode)
             // In a corner the island floats: its top corners are rounded too.
             let tr: CGFloat = state.islandPlacement.isCorner ? cr : 0
             withAnimation(anim) {
@@ -213,7 +236,7 @@ struct IslandContainer: View {
                                     nw: state.notchWidth, nh: state.notchHeight)
             islandWidth      = w
             islandHeight     = state.view == .prompt ? chatPromptHeight : h
-            cornerRadius     = state.mode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
+            cornerRadius     = islandCorner(state.mode)
             islandTopRadius  = state.islandPlacement.isCorner ? cornerRadius : 0
         }
         .onReceive(NotificationCenter.default.publisher(for: .islandResize)) { _ in
@@ -236,9 +259,16 @@ struct IslandContainer: View {
                                     nw: state.notchWidth, nh: state.notchHeight)
             islandWidth  = w
             islandHeight = (state.mode == .expanded && state.view == .prompt) ? chatPromptHeight : h
-            // The notch ↔ a corner: flat or rounded top.
+            // The notch ↔ a corner: flat or rounded top, a round tile at rest.
+            cornerRadius = islandCorner(state.mode)
             islandTopRadius = state.islandPlacement.isCorner ? cornerRadius : 0
         }
+    }
+
+    /// The island's corner radius: in a screen corner, resting or compact, a round tile.
+    private func islandCorner(_ mode: IslandMode) -> CGFloat {
+        if mode == .expanded { return IslandConst.expandedCorner }
+        return state.islandPlacement.isCorner ? IslandPlacement.tile / 2 : IslandConst.roundedCorner
     }
 
     private func modeOrder(_ m: IslandMode) -> Int {
@@ -332,9 +362,15 @@ struct BotPlacement: View {
     @ObservedObject var state: AppState
     let islandW: CGFloat
     let islandH: CGFloat
+    /// Drawn in a box held by the island's corner (corner placements): the island's
+    /// coordinates minus this, so Mochi doesn't drift while the island grows from its corner.
+    var shift: CGSize = .zero
 
     var body: some View {
-        let (cx, cy, diameter, opacity) = botPosition(mode: state.mode, view: state.view, islandW: islandW, islandH: islandH, uploadProgress: state.uploadProgress, hasNotch: state.hasNotch)
+        let (rawCx, rawCy, diameter, rawOpacity) = botPosition(mode: state.mode, view: state.view, islandW: islandW, islandH: islandH, uploadProgress: state.uploadProgress, hasNotch: state.hasNotch)
+        let cx = rawCx - shift.width, cy = rawCy - shift.height
+        // Swapping places in a corner: CornerArcView draws him on his way.
+        let opacity = state.cornerSwapping ? 0 : rawOpacity
         let canvasSize = diameter / 0.6
         let overhang: CGFloat = 40
         let isUploading = state.view == .uploading
@@ -429,7 +465,7 @@ func botPosition(mode: IslandMode, view: IslandView, islandW: CGFloat, islandH: 
         switch mode {
         // The corner tile: Mochi alone, big, in its middle.
         case .hidden, .compact:
-            return (islandW / 2, islandH / 2, min(38, max(0, islandH - 22)), 1)
+            return (islandW / 2, islandH / 2 - 2, min(38, max(0, islandH - 22)), 1)
         case .expanded where view == .overview:
             // Open: Mochi in the island's corner, the other pills around him (CornerArcView).
             let c = placement.cornerBotCenter(in: CGSize(width: islandW, height: islandH))
@@ -553,7 +589,7 @@ struct IslandContentView: View {
         let placement = state.islandPlacement
         // Home open in a top corner: Mochi and his circle take the corner, the header the rest.
         let cornerHome = placement.isCorner && state.view == .overview
-        let headerGap: CGFloat = cornerHome && !placement.isBottom ? 180 : 0
+        let headerGap: CGFloat = cornerHome ? IslandPlacement.cornerColumn : 0
         VStack(spacing: 0) {
             IslandHeader(state: state)
                 .frame(height: 34)

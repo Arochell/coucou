@@ -23,15 +23,21 @@ enum IslandPlacement: String, CaseIterable, Sendable {
     static let side: CGFloat = 40
     /// A drop of Mochi this close to a corner of the screen moves the island there.
     static let snapDistance: CGFloat = 180
-    /// The resting island in a corner: a square tile with Mochi alone (no mini Mochis).
+    /// The resting island in a corner: a round tile with Mochi alone (no mini Mochis).
     static let tile: CGFloat = 60
-    /// Open in a corner, Mochi sits this far from the island's corner (its centre)…
-    static let cornerInset: CGFloat = 56
-    /// …and the other pills' Mochis sit on a quarter circle of this radius around him.
-    static let arcRadius: CGFloat = 104
+    /// Open in a corner, Mochi sits this far from the island's corner (his centre)…
+    static let cornerInset: CGFloat = 50
+    /// …raised a little: his body is drawn a bit below the middle of his canvas, so the room
+    /// above him and beside him look the same.
+    static let lift: CGFloat = 4
+    /// The other pills' Mochis sit on a quarter circle of this radius around him, far enough
+    /// apart for their names and for two of them to cross when they swap.
+    static let arcRadius: CGFloat = 150
+    /// The room Mochi and his circle take in the corner of the open island (the card has the rest).
+    static let cornerColumn: CGFloat = 230
     /// The home view open in a corner (the Mail card reading a message: `homeReadingSize`).
-    static let homeSize = CGSize(width: 640, height: 230)
-    static let homeReadingSize = CGSize(width: 640, height: 290)
+    static let homeSize = CGSize(width: 640, height: 260)
+    static let homeReadingSize = CGSize(width: 640, height: 320)
 
     /// The placement the views read without reaching AppState (set by AppState.islandPlacement).
     nonisolated(unsafe) static var current: IslandPlacement = .notch
@@ -40,7 +46,8 @@ enum IslandPlacement: String, CaseIterable, Sendable {
     /// in its corner.
     func cornerBotCenter(in size: CGSize) -> CGPoint {
         let i = Self.cornerInset
-        return CGPoint(x: isRight ? size.width - i : i, y: isBottom ? size.height - i : i)
+        return CGPoint(x: isRight ? size.width - i : i,
+                       y: (isBottom ? size.height - i : i) - Self.lift)
     }
 
     /// The other pills' Mochis around him (y down): `count` points on the quarter circle that
@@ -56,7 +63,7 @@ enum IslandPlacement: String, CaseIterable, Sendable {
         case .bottomLeft: (0, -90)
         case .notch: (0, 0)
         }
-        let pad = 10.0
+        let pad = 4.0
         let a0 = from + (to > from ? pad : -pad), a1 = to - (to > from ? pad : -pad)
         return (0..<count).map { i in
             let t = count == 1 ? 0.5 : Double(i) / Double(count - 1)

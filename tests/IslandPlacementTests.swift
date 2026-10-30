@@ -40,20 +40,25 @@ enum IslandPlacementTests {
 
         // Open in a corner: Mochi in the corner, the others on a quarter circle facing inwards.
         let home = IslandPlacement.homeSize
-        precondition(IslandPlacement.topRight.cornerBotCenter(in: home) == CGPoint(x: 584, y: 56))
-        precondition(IslandPlacement.bottomLeft.cornerBotCenter(in: home) == CGPoint(x: 56, y: 174))
+        precondition(IslandPlacement.topRight.cornerBotCenter(in: home) == CGPoint(x: 590, y: 46))
+        precondition(IslandPlacement.bottomLeft.cornerBotCenter(in: home) == CGPoint(x: 50, y: 206))
         for p in IslandPlacement.allCases where p.isCorner {
             let c = p.cornerBotCenter(in: home)
             let pts = p.arcPoints(count: 4, in: home)
             precondition(pts.count == 4)
             for q in pts {
                 precondition(abs(hypot(q.x - c.x, q.y - c.y) - IslandPlacement.arcRadius) < 0.01)
-                precondition(q.x > 18 && q.x < home.width - 18 && q.y > 18 && q.y < home.height - 18, "\(p) \(q) inside the island")
+                // Inside the island with room for the name under it, inside the corner column.
+                precondition(q.x > 20 && q.x < home.width - 20 && q.y > 20 && q.y + 20 + 16 < home.height, "\(p) \(q) inside the island")
+                precondition(abs(q.x - c.x) + 20 <= IslandPlacement.cornerColumn, "\(p) \(q) in the corner column")
                 // Towards the inside: away from the corner's two edges.
                 precondition(p.isRight ? q.x <= c.x + 0.01 : q.x >= c.x - 0.01, "\(p) \(q)")
                 precondition(p.isBottom ? q.y <= c.y + 0.01 : q.y >= c.y - 0.01, "\(p) \(q)")
             }
         }
+        // Four on the circle: room between two for a line of text and their crossing.
+        let four = IslandPlacement.topRight.arcPoints(count: 4, in: home)
+        for (a, b) in zip(four, four.dropFirst()) { precondition(hypot(a.x - b.x, a.y - b.y) > 70) }
         precondition(IslandPlacement.notch.arcPoints(count: 3, in: home).isEmpty)
         let t = IslandPlacement.bottomRight.dropTarget(screen: screen, visible: visible, panelSize: panel)
         precondition(t == CGRect(x: 1442, y: 80, width: 60, height: 60), "\(t)")
