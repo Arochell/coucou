@@ -213,100 +213,31 @@ enum MailFilter: String, CaseIterable, Sendable {
 
 // MARK: - AppleScript pieces
 
+/// The notch's search and quick filters, run here on the newest messages Mail gave in one
+/// read (MailController.searchDepth per inbox). Asking Mail to search (`whose`) scans whole
+/// mailboxes and freezes it on a big inbox.
+enum MailSearch {
+    static func matches(sender: String, subject: String, date: Date, isRead: Bool, isFlagged: Bool,
+                        query: MailQuery, filter: MailFilter,
+                        now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        switch filter {
+        case .all: break
+        case .unread: if isRead { return false }
+        case .flagged: if !isFlagged { return false }
+        case .today: if !calendar.isDate(date, inSameDayAs: now) { return false }
+        }
+        let s = MailTriage.normalize(sender), sub = MailTriage.normalize(subject)
+        for w in query.words.map(MailTriage.normalize) where !s.contains(w) && !sub.contains(w) { return false }
+        for f in query.from.map(MailTriage.normalize) where !s.contains(f) { return false }
+        for x in query.subject.map(MailTriage.normalize) where !sub.contains(x) { return false }
+        return true
+    }
+}
+
 enum MailScript {
     /// A string inside AppleScript double quotes.
     static func quote(_ s: String) -> String {
         "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
-    }
-
-    /// The `whose` test for a search and a filter, nil when there is nothing to test.
-    /// A "today" filter needs `set d0 to …` before it (see `todayPrelude`).
-    static func whoseClause(_ q: MailQuery, _ filter: MailFilter) -> String? {
-        var parts: [String] = []
-        for w in q.words { parts.append("(subject contains \(quote(w)) or sender contains \(quote(w)))") }
-        for f in q.from { parts.append("sender contains \(quote(f))") }
-        for s in q.subject { parts.append("subject contains \(quote(s))") }
-        switch filter {
-        case .all: break
-        case .unread: parts.append("read status is false")
-        case .flagged: parts.append("flagged status is true")
-        case .today: parts.append("date received > d0")
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " and ")
-    }
-
-    static let todayPrelude = "set d0 to (current date) - (time of (current date))"
-
-    /// Messages of every account's inbox matching `whose`, in the list format of
-    /// MailController.parseList (unread count first, then one record per message).
-    /// At most `limit` messages per inbox, the newest: an inbox with a thousand unread
-    /// messages answers in a second, and the other scripts (a message opened) don't wait.
-    static func searchScript(whose: String, today: Bool, limit: Int = 60) -> String {
-        """
-        set RS to character id 30
-        set US to character id 31
-        tell application id "com.apple.mail"
-            \(today ? todayPrelude : "")
-            set out to ""
-            set accs to {}
-            try
-                set accs to (every account whose enabled is true)
-            on error
-                try
-                    set accs to every account
-                end try
-            end try
-            repeat with acc in accs
-                set mb to missing value
-                try
-                    set mb to mailbox "INBOX" of acc
-                on error
-                    try
-                        set mb to mailbox "Inbox" of acc
-                    end try
-                end try
-                if mb is not missing value then
-                    try
-                        set ids to id of (every message of mb whose \(whose))
-                        set subs to subject of (every message of mb whose \(whose))
-                        set snds to sender of (every message of mb whose \(whose))
-                        set dts to date received of (every message of mb whose \(whose))
-                        set rds to read status of (every message of mb whose \(whose))
-                        set fls to flagged status of (every message of mb whose \(whose))
-                        set c to count of ids
-                        set a to 1
-                        set b to c
-                        if c > \(limit) then
-                            -- The newest: the start of the list when message 1 is the most recent.
-                            try
-                                if (item 1 of dts) < (item c of dts) then
-                                    set a to c - \(limit) + 1
-                                else
-                                    set b to \(limit)
-                                end if
-                            on error
-                                set b to \(limit)
-                            end try
-                        end if
-                        repeat with i from a to b
-                            try
-                                set s to item i of subs
-                                if s is missing value then set s to ""
-                                set f to item i of snds
-                                if f is missing value then set f to ""
-                                set d to ""
-                                try
-                                    set d to ((item i of dts) as «class isot» as string)
-                                end try
-                                set out to out & RS & ((item i of ids) as string) & US & (name of acc) & US & (name of mb) & US & f & US & s & US & d & US & ((item i of rds) as string) & US & ((item i of fls) as string)
-                            end try
-                        end repeat
-                    end try
-                end if
-            end repeat
-            return out
-        end tell
-        """
     }
 
     /// The names a Junk mailbox has, depending on the provider and the language.
@@ -380,7 +311,7 @@ enum MailScript {
         """
         tell application id "com.apple.mail"
             set acc to account \(quote(account))
-            set m to first message of mailbox \(quote(mailbox)) of acc whose id is \(messageId)
+            set m to message id \(messageId) of mailbox \(quote(mailbox)) of acc
             set rid to ""
             try
                 set rid to message id of m
