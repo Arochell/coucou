@@ -26,6 +26,13 @@ let pendingTimeout: number | null = null;
 export function dropPendingCard(island: Island): void {
   if (!State.pendingApproval) return;
   State.endApproval();
+  if (State.pendingApproval) {
+    const view = State.pendingApproval.questions ? "question" : "approval";
+    island.setView(view);
+    Sound.play(view);
+    State.notify();
+    return;
+  }
   island.dropPin();
   if (State.view === "approval" || State.view === "question") {
     island.setView(State.defaultView());
@@ -246,6 +253,7 @@ export function registerHookHandlers(island: Island) {
   // The relay stopped waiting without a decision and the terminal has taken
   // over: a card still up for that request would be lying (#857).
   void onEvent<string>("approval-expired", (requestId) => {
+    State.approvalQueue = State.approvalQueue.filter((x) => x.requestId !== requestId);
     if (State.pendingApproval?.requestId !== requestId) return;
     if (pendingTimeout != null) window.clearTimeout(pendingTimeout);
     pendingTimeout = null;
@@ -498,38 +506,46 @@ function handleHook(island: Island, payload: HookPayload) {
       }
 
       const requestId = payload.request_id ?? "";
-      // One card, one request. A second one must never quietly replace the first
-      // — that would leave a human staring at request B while request A waits for
-      // a decision nobody can give. Hand it straight back to the terminal.
-      if (State.pendingApproval && State.pendingApproval.requestId !== requestId) {
+      // If this exact request is already showing or queued, ack again and leave it alone
+      if (State.pendingApproval?.requestId === requestId || State.approvalQueue.some((x) => x.requestId === requestId)) {
+        if (requestId) void Bridge.approvalAck(requestId);
+        break;
+      }
+
+      // Max 5 concurrent requests waiting (matching macOS ApprovalQueue.maxPending)
+      const totalPending = (State.pendingApproval ? 1 : 0) + State.approvalQueue.length;
+      if (totalPending >= 5) {
         if (requestId) void Bridge.approvalDecline(requestId);
         break;
       }
+
       ensurePill();
       supersedeStop();
-      if (pendingTimeout != null) window.clearTimeout(pendingTimeout);
       const tool = payload.tool_name ?? "Tool";
       const input = payload.tool_input ?? {};
-      // Claude Code asking a question is not a permission to grant: the island
-      // shows the options and sends back the one that was picked. Only Claude
-      // Code asks questions this way.
       const questions = isExternalAgent ? null : askedQuestions(tool, input);
       const view = questions ? "question" : "approval";
-      // The card always comes up, even over another pill or an island that is
-      // already open: its pill comes to the front, and the one you were on
-      // comes back once you answer (Mac #117, #120).
-      State.beginApproval({
+
+      const info: ApprovalInfo = {
         requestId,
         sessionId,
         pillId: agentId,
         tool,
         command: approvalTarget(tool, input),
         ...(questions ? { questions } : {}),
-      });
-      // The relay's short ack window closes in 800 ms; everything below this
-      // line is synchronous, so the card really is up by the time it lands.
-      if (requestId) void Bridge.approvalAck(requestId);
-      State.updateTask(agentId, view);
+      };
+
+      if (!State.pendingApproval) {
+        if (pendingTimeout != null) window.clearTimeout(pendingTimeout);
+        State.beginApproval(info);
+        if (requestId) void Bridge.approvalAck(requestId);
+        State.updateTask(agentId, view);
+        Sound.play(view);
+      } else {
+        // Queue behind the currently showing request
+        State.approvalQueue.push(info);
+        if (requestId) void Bridge.approvalAck(requestId);
+      }
       Sound.play(view);
       // Any agent's card (Claude Code, Codex, Copilot CLI, Muse Code) comes up
       // the same way: beginApproval brought its pill to the front.

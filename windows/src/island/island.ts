@@ -146,6 +146,12 @@ export class Island {
   /** The request has its answer: the card goes and the session carries on. */
   private closeApproval() {
     State.endApproval();
+    if (State.pendingApproval) {
+      const view = State.pendingApproval.questions ? "question" : "approval";
+      this.setView(view);
+      Sound.play(view);
+      return;
+    }
     this.fsm.pinned = false;
     this.setView(State.defaultView());
   }

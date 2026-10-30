@@ -519,13 +519,27 @@ test("a request from Claude Code in Cursor's terminal goes on the Cursor pill", 
   assert.equal(task().state, "idle");
 });
 
-test("a second request never replaces the card: it goes back to the terminal", () => {
+test("a second request is queued in line: it waits for the first card to finish (#870)", () => {
   ask("r1");
   ask("r2", { tool_name: "Bash", tool_input: { command: "ls" } });
   assert.equal(State.pendingApproval.requestId, "r1");
   assert.equal(State.pendingApproval.tool, "Write");
-  assert.deepEqual(sent("approval_decline"), [{ requestId: "r2" }]);
-  assert.deepEqual(sent("approval_ack"), [{ requestId: "r1" }]);
+  assert.equal(State.approvalQueue.length, 1);
+  assert.equal(State.approvalQueue[0].requestId, "r2");
+  assert.deepEqual(sent("approval_decline"), []);
+  assert.deepEqual(sent("approval_ack"), [{ requestId: "r1" }, { requestId: "r2" }]);
+
+  // When r1 finishes, r2 takes the card
+  State.endApproval();
+  assert.equal(State.pendingApproval.requestId, "r2");
+  assert.equal(State.pendingApproval.tool, "Bash");
+  assert.equal(State.approvalQueue.length, 0);
+
+  // Beyond maxPending (5 total), new requests are declined
+  ask("r3"); ask("r4"); ask("r5"); ask("r6");
+  assert.equal(State.approvalQueue.length, 4); // r2 active + r3..r6 queued = 5 total
+  ask("r7");
+  assert.deepEqual(sent("approval_decline"), [{ requestId: "r7" }]);
 });
 
 test("the same request arriving twice is acknowledged again, not declined", () => {
@@ -707,9 +721,9 @@ test("a declined permission request leaves the stop timer running", () => {
     { coucou_agent: "gemini" },
   );
   assert.equal(task("agent_gemini"), undefined);
-  // So is a second request while a card is already up.
+  // So is a request from an agent that doesn't take approvals.
   ask("r1");
-  afterStop(() => ask("r2"));
+  afterStop(() => hook({ hook_event_name: "PermissionRequest", request_id: "r2", coucou_agent: "gemini", tool_name: "Bash" }));
   assert.deepEqual(sent("approval_decline"), [{ requestId: "r1" }, { requestId: "r2" }]);
   assert.equal(task().state, "idle");
 });
