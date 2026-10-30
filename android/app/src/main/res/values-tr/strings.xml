@@ -315,7 +315,7 @@
     <string name="file_loading">Değişiklikler yükleniyor…</string>
     <string name="file_failed">Bu değişiklik yüklenemedi. Bağlantıyı kontrol edip yeniden dene.</string>
     <string name="file_gone">Bu değişiklik artık bilgisayarında mevcut değil.</string>
-    <string name="file_too_large">Bu değişiklik satır satır gösterilemeyecek kadar büyük.</string>
+    <string name="file_too_large">Bu değişiklik satır bazında gösterilemeyecek kadar büyük.</string>
     <string name="file_truncated">Yalnızca ilk 200 satır gösteriliyor.</string>
     <string name="file_empty">Gösterilecek bir şey yok.</string>
     <string name="file_close">Kapat</string>

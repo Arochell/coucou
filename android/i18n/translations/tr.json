@@ -314,7 +314,7 @@
     "file_loading": "Değişiklikler yükleniyor…",
     "file_failed": "Bu değişiklik yüklenemedi. Bağlantıyı kontrol edip yeniden dene.",
     "file_gone": "Bu değişiklik artık bilgisayarında mevcut değil.",
-    "file_too_large": "Bu değişiklik satır satır gösterilemeyecek kadar büyük.",
+    "file_too_large": "Bu değişiklik satır bazında gösterilemeyecek kadar büyük.",
     "file_truncated": "Yalnızca ilk 200 satır gösteriliyor.",
     "file_empty": "Gösterilecek bir şey yok.",
     "file_close": "Kapat",
