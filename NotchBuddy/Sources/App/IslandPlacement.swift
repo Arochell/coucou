@@ -23,10 +23,17 @@ enum IslandPlacement: String, CaseIterable, Sendable {
     static let side: CGFloat = 40
     /// A drop of Mochi this close to a corner of the screen moves the island there.
     static let snapDistance: CGFloat = 180
-    /// The resting island in a corner: a round tile with Mochi alone (no mini Mochis).
+    /// The resting island in a corner: a square tile with rounded corners, Mochi alone in it.
     static let tile: CGFloat = 60
-    /// Open in a corner, Mochi sits this far from the island's corner (his centre)…
+    static let tileCorner: CGFloat = 18
+    /// Hovering the tile: the other pills come out of it one after the other, as small tiles
+    /// along the screen's edge (the size of each, and the room between two).
+    static let bubble: CGFloat = 40
+    static let bubbleGap: CGFloat = 8
+    /// Open in a corner, the circle of Mochis is centred this far from the island's corner…
     static let cornerInset: CGFloat = 50
+    /// …and Mochi sits nearer to them, this much further in on each side.
+    static let cornerPull: CGFloat = 30
     /// …raised a little: his body is drawn a bit below the middle of his canvas, so the room
     /// above him and beside him look the same.
     static let lift: CGFloat = 4
@@ -42,19 +49,43 @@ enum IslandPlacement: String, CaseIterable, Sendable {
     /// The placement the views read without reaching AppState (set by AppState.islandPlacement).
     nonisolated(unsafe) static var current: IslandPlacement = .notch
 
-    /// Mochi's centre in an open island of `size`, in the island's own coordinates (y down):
-    /// in its corner.
-    func cornerBotCenter(in size: CGSize) -> CGPoint {
+    /// The centre of the circle the other Mochis sit on, in an open island of `size`, in the
+    /// island's own coordinates (y down): near its corner.
+    func cornerArcCenter(in size: CGSize) -> CGPoint {
         let i = Self.cornerInset
         return CGPoint(x: isRight ? size.width - i : i,
                        y: (isBottom ? size.height - i : i) - Self.lift)
+    }
+
+    /// Mochi's centre in an open island (y down): in the corner, pulled towards his circle.
+    func cornerBotCenter(in size: CGSize) -> CGPoint {
+        let c = cornerArcCenter(in: size), d = Self.cornerPull
+        return CGPoint(x: c.x + (isRight ? -d : d), y: c.y + (isBottom ? -d : d))
+    }
+
+    /// Hovering the tile: where the other pills' small tiles go (centres, in the tile's own
+    /// coordinates, y down), one after the other along the screen's edge, inwards.
+    func bubbleCenters(count: Int, tile: CGFloat = IslandPlacement.tile) -> [CGPoint] {
+        guard isCorner else { return [] }
+        let step = Self.bubble + Self.bubbleGap
+        return (0..<count).map { i in
+            let d = Self.bubbleGap + Self.bubble / 2 + CGFloat(i) * step
+            return CGPoint(x: isRight ? -d : tile + d, y: tile / 2)
+        }
+    }
+
+    /// The tile and its small tiles together (tile coordinates, y down): the pointer may go
+    /// from one to the other without the island closing them.
+    func bubblesRect(count: Int, tile: CGFloat = IslandPlacement.tile) -> CGRect {
+        let w = CGFloat(count) * (Self.bubble + Self.bubbleGap)
+        return CGRect(x: isRight ? -w : 0, y: 0, width: tile + w, height: tile)
     }
 
     /// The other pills' Mochis around him (y down): `count` points on the quarter circle that
     /// faces the inside of the screen, from the side along the edge to the side going inwards.
     func arcPoints(count: Int, in size: CGSize) -> [CGPoint] {
         guard count > 0, isCorner else { return [] }
-        let c = cornerBotCenter(in: size), r = Self.arcRadius
+        let c = cornerArcCenter(in: size), r = Self.arcRadius
         // Angles (degrees, y down): the quarter facing away from the corner.
         let (from, to): (Double, Double) = switch self {
         case .topRight: (180, 90)

@@ -470,9 +470,21 @@ final class IslandWindowController: NSWindowController {
         let islandRect = panel.currentIslandFrame(nw: notchW, nh: notchH)
         // On a screen without a notch, the resting bar must not intercept clicks
         // in the app window immediately below the menu bar.
-        let hoverRect = !hasNotch && state.mode != .expanded
+        var hoverRect = !hasNotch && state.mode != .expanded
             ? islandRect : islandRect.insetBy(dx: -6, dy: -6)
+        // Compact in a corner with the pills out of the tile: they count as the island.
+        let placement = state.islandPlacement
+        if placement.isCorner && state.mode == .compact && state.cornerPeek {
+            let n = CornerBubbles.count(state)
+            if n > 0 {
+                let b = placement.bubblesRect(count: n)   // tile coordinates, y down
+                hoverRect = hoverRect.union(CGRect(x: islandRect.minX + b.minX, y: islandRect.maxY - b.maxY,
+                                                   width: b.width, height: b.height))
+            }
+        }
         let inIsland = hoverRect.contains(local)
+        let peek = placement.isCorner && state.mode == .compact && inIsland
+        if state.cornerPeek != peek { state.cornerPeek = peek }
 
         // Toggle click-through
         let shouldAcceptMouse = inIsland || inAttachDrag || attachDragStart != nil

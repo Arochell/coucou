@@ -16,6 +16,8 @@ struct CornerArcView: View {
     /// Two Mochis swapping places: the one arriving in the corner and the one leaving it.
     @State private var swap: Swap? = nil
     @State private var swapStart = Date.distantPast
+    /// Circles drawn out (ring off): the one a Mochi left, the one a Mochi just reached.
+    @State private var ringOff: Set<String> = []
 
     private struct Swap: Equatable {
         let incoming: AgentTask
@@ -60,11 +62,11 @@ struct CornerArcView: View {
 
             ForEach(Array(tasks.enumerated()), id: \.element.id) { i, task in
                 let leaving = swap?.incoming.id == task.id
-                CornerMini(task: task) { start(task, at: i, current: tasks) }
-                    // Its Mochi is on its way to the corner (drawn below): the button stays empty.
-                    .opacity(leaving ? 0 : 1)
-                    .position(i < points.count ? points[i] : home)
-                    .transition(.opacity)
+                // Its Mochi on its way to the corner (drawn below): its circle draws itself out.
+                CornerMini(task: task, ring: ringOff.contains(task.id) ? 0 : 1, showBot: !leaving) {
+                    start(task, at: i, current: tasks)
+                }
+                .position(i < points.count ? points[i] : home)
             }
 
             // The swap: each one on its own curve, crossing the other halfway.
@@ -99,6 +101,7 @@ struct CornerArcView: View {
         if index < ids.count { ids[index] = focus.id }
         swapStart = Date()
         swap = Swap(incoming: task, outgoing: focus, slot: index, order: ids)
+        ringOff.insert(task.id)
         state.cornerSwapping = true
         SoundEngine.shared.play("blip")
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.swapDuration) { finish() }
@@ -114,7 +117,11 @@ struct CornerArcView: View {
             state.setFocus(s.incoming.id)
             state.cornerSwapping = false
             swap = nil
+            ringOff.remove(s.incoming.id)
+            ringOff.insert(s.outgoing.id)
         }
+        // The one that left the corner has reached its place: its circle draws itself in.
+        DispatchQueue.main.async { ringOff.remove(s.outgoing.id) }
     }
 }
 
@@ -138,8 +145,123 @@ enum CornerCurve {
     }
 }
 
-/// One pill's Mochi on the circle: a round button in its colour, its name under it.
+/// One pill's Mochi on the circle: a round button in its colour, its name under it. Its circle
+/// draws itself in and out from the top, down both sides at once (`ring`, 0 to 1).
 private struct CornerMini: View {
+    let task: AgentTask
+    let ring: CGFloat
+    let showBot: Bool
+    let onTap: () -> Void
+    @State private var hover = false
+
+    private var name: String {
+        task.id == "integration_claude" ? ClaudeHost.pillName(hostApp: task.hostApp) : task.name
+    }
+
+    var body: some View {
+        let color = Color(hex: task.color)
+        Button(action: onTap) {
+            ZStack(alignment: .topTrailing) {
+                ZStack {
+                    Circle()
+                        .fill(hover ? color.opacity(0.18) : Color(hex: "#0E0F11"))
+                        .opacity(ring)
+                    HalfRing(right: true)
+                        .trim(from: 0, to: ring)
+                        .stroke(color.opacity(hover ? 0.6 : 0.3), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+                    HalfRing(right: false)
+                        .trim(from: 0, to: ring)
+                        .stroke(color.opacity(hover ? 0.6 : 0.3), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+                    MiniBotCanvasView(task: task)
+                        .frame(width: CornerArcView.smallBody / 0.6, height: CornerArcView.smallBody / 0.6)
+                        .frame(width: CornerArcView.smallBody, height: CornerArcView.smallBody)
+                        .opacity(showBot ? 1 : 0)
+                }
+                .frame(width: 40, height: 40)
+                .shadow(color: color.opacity(hover ? 0.35 : 0), radius: 10)
+
+                if let badge = task.pillBadge {
+                    PillBadgeView(badge: badge, taskColor: task.color)
+                        .offset(x: 2, y: -2)
+                        .opacity(ring)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                Text(verbatim: name)
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundColor(hover ? color.lighter(by: 0.3) : Color(hex: "#8E939C"))
+                    .lineLimit(1)
+                    .fixedSize()
+                    .offset(y: 15 - 4 * (1 - ring))
+                    .opacity(ring)
+                    .allowsHitTesting(false)
+            }
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(hover ? 1.1 : 1)
+        .animation(.easeInOut(duration: 0.32), value: ring)
+        .onHover { h in withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { hover = h } }
+        .help(name)
+    }
+}
+
+/// Half a circle, from its top down to its bottom, on the right side or the left one.
+private struct HalfRing: Shape {
+    let right: Bool
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        // SwiftUI's y goes down: "not clockwise" here turns clockwise on screen (the right side).
+        p.addArc(center: CGPoint(x: rect.midX, y: rect.midY), radius: min(rect.width, rect.height) / 2,
+                 startAngle: .degrees(-90), endAngle: .degrees(90), clockwise: !right)
+        return p
+    }
+}
+
+/// Compact in a corner, the pointer on the tile: the other pills come out of it one after the
+/// other, each small tile born from the one before, along the screen's edge. A click opens
+/// the island on that pill.
+struct CornerBubbles: View {
+    @ObservedObject var state: AppState
+    @State private var shown = 0
+
+    static let maxShown = 4
+
+    static func tasks(_ state: AppState) -> [AgentTask] {
+        let focus = state.focusTask?.id
+        return Array(state.tasks.filter { $0.id != focus }.prefix(maxShown))
+    }
+
+    static func count(_ state: AppState) -> Int { tasks(state).count }
+
+    var body: some View {
+        let placement = state.islandPlacement
+        let tasks = Self.tasks(state)
+        let centers = placement.bubbleCenters(count: tasks.count)
+        let t = IslandPlacement.tile
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(tasks.enumerated()), id: \.element.id) { i, task in
+                let out = i < shown
+                let from = i == 0 ? CGPoint(x: t / 2, y: t / 2) : centers[i - 1]
+                CornerBubble(task: task) { state.setFocus(task.id) }
+                    .scaleEffect(out ? 1 : 0.3)
+                    .opacity(out ? 1 : 0)
+                    .position(out ? centers[i] : from)
+            }
+        }
+        .frame(width: t, height: t, alignment: .topLeading)
+        .onAppear {
+            for i in 0..<tasks.count {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.06 * Double(i)) {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.68)) { shown = max(shown, i + 1) }
+                }
+            }
+        }
+    }
+}
+
+/// One of them: a small black tile with rounded corners, the pill's mini Mochi inside.
+private struct CornerBubble: View {
     let task: AgentTask
     let onTap: () -> Void
     @State private var hover = false
@@ -149,37 +271,29 @@ private struct CornerMini: View {
     }
 
     var body: some View {
+        let color = Color(hex: task.color)
         Button(action: onTap) {
             ZStack(alignment: .topTrailing) {
                 ZStack {
-                    Circle()
-                        .fill(hover ? Color(hex: task.color).opacity(0.18) : Color(hex: "#0E0F11"))
-                    Circle()
-                        .stroke(Color(hex: task.color).opacity(hover ? 0.6 : 0.22), lineWidth: 1.2)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.black)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(color.opacity(hover ? 0.6 : 0.25), lineWidth: 1)
                     MiniBotCanvasView(task: task)
-                        .frame(width: CornerArcView.smallBody / 0.6, height: CornerArcView.smallBody / 0.6)
-                        .frame(width: CornerArcView.smallBody, height: CornerArcView.smallBody)
+                        .frame(width: 22 / 0.6, height: 22 / 0.6)
+                        .frame(width: 22, height: 22)
                 }
-                .frame(width: 40, height: 40)
-                .shadow(color: Color(hex: task.color).opacity(hover ? 0.35 : 0), radius: 10)
+                .frame(width: IslandPlacement.bubble, height: IslandPlacement.bubble)
+                .shadow(color: .black.opacity(0.45), radius: 10, y: 4)
 
                 if let badge = task.pillBadge {
                     PillBadgeView(badge: badge, taskColor: task.color)
-                        .offset(x: 2, y: -2)
+                        .offset(x: 3, y: -3)
                 }
-            }
-            .overlay(alignment: .bottom) {
-                Text(verbatim: name)
-                    .font(.system(size: 9.5, weight: .semibold))
-                    .foregroundColor(hover ? Color(hex: task.color).lighter(by: 0.3) : Color(hex: "#8E939C"))
-                    .lineLimit(1)
-                    .fixedSize()
-                    .offset(y: 15)
-                    .allowsHitTesting(false)
             }
         }
         .buttonStyle(.plain)
-        .scaleEffect(hover ? 1.1 : 1)
+        .scaleEffect(hover ? 1.08 : 1)
         .onHover { h in withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { hover = h } }
         .help(name)
     }

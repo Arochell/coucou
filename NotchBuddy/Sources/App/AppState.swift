@@ -359,6 +359,8 @@ final class AppState: ObservableObject {
 
     /// Two Mochis swapping places in a corner (CornerArcView draws both): the main one hides.
     @Published var cornerSwapping = false
+    /// The pointer on the compact tile in a corner: the other pills come out of it (CornerBubbles).
+    @Published var cornerPeek = false
 
     /// Where the island lives on its screen: the notch, or a corner (IslandPlacement) — persisted.
     @Published var islandPlacement: IslandPlacement = .notch {

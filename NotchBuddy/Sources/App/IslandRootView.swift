@@ -125,6 +125,13 @@ struct IslandContainer: View {
                 }
             }
 
+            // Compact in a corner, the pointer on it: the other pills come out of the tile.
+            if state.mode == .compact && state.islandPlacement.isCorner && state.cornerPeek {
+                CornerBubbles(state: state)
+                    .frame(width: islandWidth, height: islandHeight)
+                    .transition(.opacity)
+            }
+
             // Open in a corner: the other pills' Mochis on a quarter circle around Mochi.
             if state.mode == .expanded && state.view == .overview && state.islandPlacement.isCorner
                 && !uploadActive && !greetingActive {
@@ -142,14 +149,12 @@ struct IslandContainer: View {
                 // Mochi only moves between his own places (the tile's middle, the open corner).
                 let p = state.islandPlacement
                 let box: CGFloat = 300
+                // No mask here: a mask growing with the island cut him while he moved.
                 BotPlacement(state: state, islandW: islandWidth, islandH: islandHeight,
                              shift: CGSize(width: p.isRight ? islandWidth - box : 0,
-                                           height: p.isBottom ? islandHeight - box : 0))
+                                           height: p.isBottom ? islandHeight - box : 0),
+                             damping: 0.92)
                     .frame(width: box, height: box)
-                    .mask(alignment: p.alignment) {
-                        Rectangle().frame(width: islandWidth,
-                                          height: state.mode == .expanded ? 320 : islandHeight)
-                    }
                     .frame(width: islandWidth, height: islandHeight, alignment: p.alignment)
                     .opacity(uploadActive || greetingActive ? 0 : 1)
                     .animation(.easeInOut(duration: 0.25), value: uploadActive || greetingActive)
@@ -268,7 +273,7 @@ struct IslandContainer: View {
     /// The island's corner radius: in a screen corner, resting or compact, a round tile.
     private func islandCorner(_ mode: IslandMode) -> CGFloat {
         if mode == .expanded { return IslandConst.expandedCorner }
-        return state.islandPlacement.isCorner ? IslandPlacement.tile / 2 : IslandConst.roundedCorner
+        return state.islandPlacement.isCorner ? IslandPlacement.tileCorner : IslandConst.roundedCorner
     }
 
     private func modeOrder(_ m: IslandMode) -> Int {
@@ -365,6 +370,8 @@ struct BotPlacement: View {
     /// Drawn in a box held by the island's corner (corner placements): the island's
     /// coordinates minus this, so Mochi doesn't drift while the island grows from its corner.
     var shift: CGSize = .zero
+    /// How he springs between his places (in a corner: no bounce, he goes straight there).
+    var damping: Double = 0.72
 
     var body: some View {
         let (rawCx, rawCy, diameter, rawOpacity) = botPosition(mode: state.mode, view: state.view, islandW: islandW, islandH: islandH, uploadProgress: state.uploadProgress, hasNotch: state.hasNotch)
@@ -422,9 +429,9 @@ struct BotPlacement: View {
                     .frame(width: canvasSize, height: canvasSize + overhang)
                     .opacity(state.isDraggingBot || state.mochiOnDesktop ? 0 : opacity)
                     .position(x: cx, y: cy - overhang / 2)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.72), value: cx)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.72), value: cy)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.72), value: canvasSize)
+                    .animation(.spring(response: 0.5, dampingFraction: damping), value: cx)
+                    .animation(.spring(response: 0.5, dampingFraction: damping), value: cy)
+                    .animation(.spring(response: 0.5, dampingFraction: damping), value: canvasSize)
                     .transition(.scale(scale: 0.01, anchor: .center).combined(with: .opacity))
             }
         }

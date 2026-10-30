@@ -40,14 +40,18 @@ enum IslandPlacementTests {
 
         // Open in a corner: Mochi in the corner, the others on a quarter circle facing inwards.
         let home = IslandPlacement.homeSize
-        precondition(IslandPlacement.topRight.cornerBotCenter(in: home) == CGPoint(x: 590, y: 46))
-        precondition(IslandPlacement.bottomLeft.cornerBotCenter(in: home) == CGPoint(x: 50, y: 206))
+        precondition(IslandPlacement.topRight.cornerArcCenter(in: home) == CGPoint(x: 590, y: 46))
+        precondition(IslandPlacement.topRight.cornerBotCenter(in: home) == CGPoint(x: 560, y: 76), "nearer to his circle")
+        precondition(IslandPlacement.bottomLeft.cornerBotCenter(in: home) == CGPoint(x: 80, y: 176))
         for p in IslandPlacement.allCases where p.isCorner {
-            let c = p.cornerBotCenter(in: home)
+            let c = p.cornerArcCenter(in: home)
             let pts = p.arcPoints(count: 4, in: home)
+            // Mochi closer to each of them than the circle's centre is, and never on one.
+            let b = p.cornerBotCenter(in: home)
             precondition(pts.count == 4)
             for q in pts {
                 precondition(abs(hypot(q.x - c.x, q.y - c.y) - IslandPlacement.arcRadius) < 0.01)
+                precondition(hypot(q.x - b.x, q.y - b.y) < IslandPlacement.arcRadius && hypot(q.x - b.x, q.y - b.y) > 80)
                 // Inside the island with room for the name under it, inside the corner column.
                 precondition(q.x > 20 && q.x < home.width - 20 && q.y > 20 && q.y + 20 + 16 < home.height, "\(p) \(q) inside the island")
                 precondition(abs(q.x - c.x) + 20 <= IslandPlacement.cornerColumn, "\(p) \(q) in the corner column")
@@ -60,6 +64,13 @@ enum IslandPlacementTests {
         let four = IslandPlacement.topRight.arcPoints(count: 4, in: home)
         for (a, b) in zip(four, four.dropFirst()) { precondition(hypot(a.x - b.x, a.y - b.y) > 70) }
         precondition(IslandPlacement.notch.arcPoints(count: 3, in: home).isEmpty)
+        // Hovering the tile: the small tiles go along the edge, inwards, inside their hover area.
+        let bubbles = IslandPlacement.topRight.bubbleCenters(count: 4)
+        precondition(bubbles.count == 4 && bubbles.allSatisfy { $0.x < 0 && $0.y == 30 })
+        precondition(zip(bubbles, bubbles.dropFirst()).allSatisfy { $0.x - $1.x == 48 })
+        let area = IslandPlacement.topRight.bubblesRect(count: 4)
+        precondition(bubbles.allSatisfy { area.contains($0) } && area.contains(CGPoint(x: 30, y: 30)))
+        precondition(IslandPlacement.bottomLeft.bubbleCenters(count: 2).allSatisfy { $0.x > 60 })
         let t = IslandPlacement.bottomRight.dropTarget(screen: screen, visible: visible, panelSize: panel)
         precondition(t == CGRect(x: 1442, y: 80, width: 60, height: 60), "\(t)")
         print("IslandPlacement tests: all passed")
