@@ -242,18 +242,20 @@ pub fn write(install: bool, fingerprint: &str) -> Result<String, String> {
 //
 // Claude Code runs one `statusLine` command and hands it the plan limits. Coucou
 // puts its relay there; a status line the user already had is kept in
-// statusline-previous.json beside the relay, and the relay still runs it, so it
-// keeps working. Installing and removing it is separate from the hooks, and
-// goes through the same hardened writer (config_file.rs): strict read, diff,
-// fingerprint, dated backup, then the write.
+// statusline-previous.json in local_dir() (outside bin/, surviving uninstaller),
+// and the relay still runs it, so it keeps working. Installing and removing it
+// is separate from the hooks, and goes through the same hardened writer
+// (config_file.rs): strict read, diff, fingerprint, dated backup, then the write.
 
 /// Where the user's own status line waits while the relay stands in for it.
 pub fn status_line_previous_path() -> PathBuf {
-    settings::hook_exe_path().with_file_name("statusline-previous.json")
+    settings::local_dir().join("statusline-previous.json")
 }
 
 fn read_status_line_previous() -> Option<Value> {
-    let bytes = std::fs::read(status_line_previous_path()).ok()?;
+    let bytes = std::fs::read(status_line_previous_path())
+        .or_else(|_| std::fs::read(settings::hook_exe_path().with_file_name("statusline-previous.json")))
+        .ok()?;
     serde_json::from_slice::<Value>(&bytes).ok().filter(Value::is_object)
 }
 
@@ -329,10 +331,12 @@ pub fn status_line_write(install: bool, fingerprint: &str) -> Result<String, Str
         // Back in settings.json: the saved copy has done its job.
         Ok(_) if !install => {
             let _ = std::fs::remove_file(status_line_previous_path());
+            let _ = std::fs::remove_file(settings::hook_exe_path().with_file_name("statusline-previous.json"));
         }
         // Nothing was written: do not leave a stale copy behind.
         Err(_) if saved => {
             let _ = std::fs::remove_file(status_line_previous_path());
+            let _ = std::fs::remove_file(settings::hook_exe_path().with_file_name("statusline-previous.json"));
         }
         _ => {}
     }
