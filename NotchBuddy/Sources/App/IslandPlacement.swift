@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 /// Where the island lives: at the notch (top centre), or in one of the screen's four corners.
 /// In a corner it is a small floating pill that opens from its corner, downwards from the top
