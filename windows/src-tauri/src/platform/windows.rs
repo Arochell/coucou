@@ -636,6 +636,7 @@ pub fn layer_display(_island: &WebviewWindow, _mochi: &WebviewWindow) -> Option<
 
 pub fn prepare_pill_window(win: &WebviewWindow, _mode: super::DesktopMode) -> bool {
     make_non_activating(win);
+    let _ = win.set_ignore_cursor_events(true);
     true
 }
 
