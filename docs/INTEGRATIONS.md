@@ -335,6 +335,13 @@ Réglages → Chat → Local models → **Disconnect**. Efface l'URL sauvegardé
 - Actions possibles : indésirables (statut indésirable + déplacement dans la boîte Junk/Spam du compte), important (drapeau), marquer comme lu, déplacer dans un dossier. Jamais de suppression.
 - Journal : chaque action avec sa raison et un bouton Annuler, qui retrouve le mail par son Message-ID (l'id de Mail change quand un mail est déplacé) et le remet en place.
 
+### Chat : actions sur les mails (bouton Mail du chat)
+
+- Bouton « Mail » à côté du choix du modèle, éteint à chaque lancement. Allumé, chaque message du chat part avec, en dessous, les 40 derniers mails des boîtes de réception, numérotés `[n]` (`MailAgent.decorate`) : comptes et adresses, date, lu ou non, expéditeur, objet. Les 8 plus récents ont leurs pièces jointes et le début du texte ; ceux que la demande nomme (expéditeur ou mot de l'objet) ont 3 000 caractères de texte.
+- Le prompt système reçoit `MailAgentPrompt.instructions` : l'IA répond en une phrase puis donne au plus un plan, bloc ` ```coucou-mail ` en JSON. Actions : `flag` / `junk` / `read` / `move`, `reply` (brouillon ouvert dans Mail, jamais envoyé), `send` (destinataires, objet, texte, pièces jointes d'un mail ou fichiers du Mac), `merge` (un mail par destinataire, chacun avec la page d'un PDF qui contient sa clé, ou la page dans l'ordre), `save_attachments`. Pas de suppression. Marche avec tous les fournisseurs du chat (clé API ou abonnement).
+- Le bloc n'est jamais affiché tel quel : la bulle montre une carte (`MailPlanCard`) qui prépare le plan (PDF enregistré depuis Mail, découpé page par page avec PDFKit, chaque page nommée « Plans - Bordeaux.pdf »), liste les mails, en rouge ceux sans page trouvée ou à l'adresse invalide (jamais envoyés).
+- Rien ne se passe sans clic : « M'envoyer un test » envoie le premier mail à l'adresse du premier compte, « Lancer (N) » démarre un compte à rebours de 5 s annulable, puis les étapes une par une, 1,2 s entre deux envois. Rapport : faits / échecs. Les envois sont listés dans Aperçu → Envoyés par Coucou.
+
 ---
 
 ## 6bis. WhatsApp (expérimental, build GitHub uniquement)

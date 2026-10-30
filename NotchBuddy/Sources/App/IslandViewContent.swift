@@ -1464,8 +1464,11 @@ struct PromptView: View {
                     Spacer()
                 }
 
-                HStack(spacing: 0) {
+                HStack(spacing: 6) {
                     Spacer()
+                    #if !APPSTORE
+                    ChatMailToggle(state: state)
+                    #endif
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
                             showModelPicker.toggle()
@@ -1781,13 +1784,28 @@ struct ChatBubble: View {
                         if isStreaming {
                             TimelineView(.periodic(from: .now, by: 0.5)) { tl in
                                 let show = Int(tl.date.timeIntervalSinceReferenceDate / 0.5).isMultiple(of: 2)
-                                Text(message.content + (show ? "▌" : " "))
+                                // A plan being written (```coucou-mail) is not shown as raw JSON.
+                                Text(MailPlanParser.extract(message.content).prose + (show ? "▌" : " "))
                                     .font(.system(size: 12.5))
                                     .foregroundColor(Color(hex: "#B0B5BE"))
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         } else {
-                            ChatMarkdownView(markdown: message.content)
+                            let parsed = MailPlanParser.extract(message.content)
+                            VStack(alignment: .leading, spacing: 6) {
+                                if !parsed.prose.isEmpty {
+                                    ChatMarkdownView(markdown: parsed.prose)
+                                }
+                                #if !APPSTORE
+                                if let plan = parsed.plan {
+                                    MailPlanCard(plan: plan, messageId: message.id)
+                                } else if let error = parsed.error {
+                                    Text(String(format: String(localized: "mail.plan.error %@"), error))
+                                        .font(.system(size: 10.5))
+                                        .foregroundColor(Color(hex: "#F5A524"))
+                                }
+                                #endif
+                            }
                         }
                     }
                     .padding(.horizontal, 8).padding(.vertical, 6)

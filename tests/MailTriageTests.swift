@@ -8,6 +8,7 @@ enum MailTriageTests {
         search()
         scripts()
         print("MailTriage tests: all passed")
+        MailPlanTests.run()
     }
 
     static func facts(_ sender: String = "Paul <paul@client.fr>", subject: String = "Devis mai",

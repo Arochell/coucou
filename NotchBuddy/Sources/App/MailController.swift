@@ -279,7 +279,7 @@ final class MailController: ObservableObject {
 
     /// Applies `action` to the message in Mail, writes it in the journal and updates the card.
     @discardableResult
-    private func perform(_ action: MailRuleAction, on message: MailMessage, reason: MailReason) async -> Bool {
+    func perform(_ action: MailRuleAction, on message: MailMessage, reason: MailReason) async -> Bool {
         let script = MailScript.applyScript(account: message.account, mailbox: message.mailbox,
                                             messageId: message.messageId, action: action)
         guard case .success(let values) = await runAppleScript(script) else { return false }
@@ -570,7 +570,7 @@ final class MailController: ObservableObject {
     enum ScriptResult { case success([String]), denied, error }
 
     @discardableResult
-    private func runAppleScript(_ source: String) async -> ScriptResult {
+    func runAppleScript(_ source: String) async -> ScriptResult {
         await withCheckedContinuation { cont in
             queue.async {
                 guard let script = NSAppleScript(source: source) else {

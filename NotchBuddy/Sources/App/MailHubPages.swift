@@ -55,6 +55,8 @@ struct HubMailOverviewPage: View {
                 MailStat(value: today.important, label: String(localized: "hub.mail.stat.important"), color: "#F5A524")
             }
 
+            HubMailSentList()
+
             HStack {
                 HubLabel(String(localized: "hub.mail.journal"))
                 Spacer()

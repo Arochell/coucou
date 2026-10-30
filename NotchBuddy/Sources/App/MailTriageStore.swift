@@ -16,6 +16,15 @@ struct MailJournalEntry: Codable, Identifiable, Equatable, Sendable {
     var undone = false
 }
 
+/// A mail Coucou sent for the chat (a plan the user ran).
+struct MailSentEntry: Codable, Identifiable, Equatable, Sendable {
+    var id = UUID()
+    var date: Date
+    var to: [String]
+    var subject: String
+    var attachments: [String]
+}
+
 /// The Mail section's settings (rules, banned words, VIPs, automatic sorting) and the journal of
 /// what Coucou sorted. JSON files in Application Support/NotchBuddy/Mail, on this Mac only.
 @MainActor
@@ -31,6 +40,8 @@ final class MailTriageStore: ObservableObject {
     }
     /// Newest first, the last 500.
     @Published private(set) var journal: [MailJournalEntry] = []
+    /// What Coucou sent for the chat, newest first, the last 500.
+    @Published private(set) var sent: [MailSentEntry] = []
 
     /// Messages already looked at by the automatic sorting (Mail's ids), so each one is
     /// sorted once and a message put back by hand is left alone.
@@ -44,6 +55,7 @@ final class MailTriageStore: ObservableObject {
         loading = true
         settings = load(MailTriageSettings.self, from: "triage.json") ?? MailTriageSettings()
         journal = load([MailJournalEntry].self, from: "journal.json") ?? []
+        sent = load([MailSentEntry].self, from: "sent.json") ?? []
         seen = load([String].self, from: "seen.json") ?? []
         seenSet = Set(seen)
         loading = false
@@ -93,6 +105,12 @@ final class MailTriageStore: ObservableObject {
         journal.insert(entry, at: 0)
         if journal.count > 500 { journal.removeLast(journal.count - 500) }
         save(journal, to: "journal.json")
+    }
+
+    func recordSent(_ entry: MailSentEntry) {
+        sent.insert(entry, at: 0)
+        if sent.count > 500 { sent.removeLast(sent.count - 500) }
+        save(sent, to: "sent.json")
     }
 
     func markUndone(_ id: UUID) {
