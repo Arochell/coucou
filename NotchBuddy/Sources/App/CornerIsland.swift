@@ -15,7 +15,7 @@ struct CornerArcView: View {
     @State private var order: [String] = []
     /// Two Mochis swapping places: the one arriving in the corner and the one leaving it.
     @State private var swap: Swap? = nil
-    @State private var swapT: CGFloat = 0
+    @State private var swapStart = Date.distantPast
 
     private struct Swap: Equatable {
         let incoming: AgentTask
@@ -71,16 +71,21 @@ struct CornerArcView: View {
             if let s = swap, s.slot < points.count {
                 let slot = points[s.slot]
                 let small = Self.smallBody / Self.bigBody
-                MiniBotCanvasView(task: s.outgoing)
-                    .frame(width: Self.bigBody / 0.6, height: Self.bigBody / 0.6)
-                    .modifier(CurveMove(t: swapT, from: home, to: slot, bulge: 46,
-                                        fromScale: 1, toScale: small))
-                    .allowsHitTesting(false)
-                MiniBotCanvasView(task: s.incoming)
-                    .frame(width: Self.bigBody / 0.6, height: Self.bigBody / 0.6)
-                    .modifier(CurveMove(t: swapT, from: slot, to: home, bulge: 46,
-                                        fromScale: small, toScale: 1))
-                    .allowsHitTesting(false)
+                TimelineView(.animation) { tl in
+                    let t = CornerCurve.ease(tl.date.timeIntervalSince(swapStart) / Self.swapDuration)
+                    ZStack(alignment: .topLeading) {
+                        MiniBotCanvasView(task: s.outgoing)
+                            .frame(width: Self.bigBody / 0.6, height: Self.bigBody / 0.6)
+                            .scaleEffect(1 + (small - 1) * t)
+                            .position(CornerCurve.point(t, from: home, to: slot, bulge: 46))
+                        MiniBotCanvasView(task: s.incoming)
+                            .frame(width: Self.bigBody / 0.6, height: Self.bigBody / 0.6)
+                            .scaleEffect(small + (1 - small) * t)
+                            .position(CornerCurve.point(t, from: slot, to: home, bulge: 46))
+                    }
+                    .frame(width: islandW, height: islandH, alignment: .topLeading)
+                }
+                .allowsHitTesting(false)
             }
         }
         .frame(width: islandW, height: islandH, alignment: .topLeading)
@@ -92,11 +97,10 @@ struct CornerArcView: View {
         guard swap == nil, let focus = state.focusTask else { return }
         var ids = current.map(\.id)
         if index < ids.count { ids[index] = focus.id }
+        swapStart = Date()
         swap = Swap(incoming: task, outgoing: focus, slot: index, order: ids)
-        swapT = 0
         state.cornerSwapping = true
         SoundEngine.shared.play("blip")
-        withAnimation(.timingCurve(0.5, 0, 0.25, 1, duration: Self.swapDuration)) { swapT = 1 }
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.swapDuration) { finish() }
     }
 
@@ -110,37 +114,27 @@ struct CornerArcView: View {
             state.setFocus(s.incoming.id)
             state.cornerSwapping = false
             swap = nil
-            swapT = 0
         }
     }
 }
 
-/// Moves a view along a curve from `from` to `to` (a quadratic curve bowed `bulge` points to the
-/// side), resizing it on the way. Two of them with the same bulge, in opposite directions, cross.
-private struct CurveMove: ViewModifier, Animatable {
-    var t: CGFloat
-    let from: CGPoint
-    let to: CGPoint
-    let bulge: CGFloat
-    let fromScale: CGFloat
-    let toScale: CGFloat
-
-    var animatableData: CGFloat {
-        get { t }
-        set { t = newValue }
-    }
-
-    func body(content: Content) -> some View {
+/// The swap's path: a quadratic curve from `from` to `to`, bowed `bulge` points to the side.
+/// Two of them with the same bulge, in opposite directions, cross halfway.
+enum CornerCurve {
+    static func point(_ t: CGFloat, from: CGPoint, to: CGPoint, bulge: CGFloat) -> CGPoint {
         let dx = to.x - from.x, dy = to.y - from.y
         let len = max(1, hypot(dx, dy))
         let mid = CGPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
         let ctrl = CGPoint(x: mid.x - dy / len * bulge, y: mid.y + dx / len * bulge)
         let u = 1 - t
-        let p = CGPoint(x: u * u * from.x + 2 * u * t * ctrl.x + t * t * to.x,
-                        y: u * u * from.y + 2 * u * t * ctrl.y + t * t * to.y)
-        return content
-            .scaleEffect(fromScale + (toScale - fromScale) * t)
-            .position(p)
+        return CGPoint(x: u * u * from.x + 2 * u * t * ctrl.x + t * t * to.x,
+                       y: u * u * from.y + 2 * u * t * ctrl.y + t * t * to.y)
+    }
+
+    /// Slow out of the start, softly into the end.
+    static func ease(_ x: Double) -> CGFloat {
+        let t = min(1, max(0, x))
+        return CGFloat(t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3) / 2)
     }
 }
 
