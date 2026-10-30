@@ -159,6 +159,10 @@ final class HookServer: @unchecked Sendable {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = prev }
             }
         }
+        if questions.head != nil {
+            showQuestionHead()
+            return
+        }
         if let note {
             state.noteMessage = note
             state.view = .note
@@ -301,7 +305,9 @@ final class HookServer: @unchecked Sendable {
     private func showQuestionHead() {
         let state = AppState.shared
         state.waitingQuestions = questions.entries
-        guard let head = questions.head, shownQuestion != head.id else { return }
+        guard let head = questions.head else { return }
+        let needsDisplay = shownQuestion != head.id || state.view != .question
+        guard needsDisplay else { return }
         shownQuestion = head.id
         state.pendingQuestion = head.question
         state.isPinned = true
@@ -412,9 +418,13 @@ final class HookServer: @unchecked Sendable {
             }
         }
         shownQuestion = nil
+        focusBeforeQuestion = nil
         state.waitingQuestions = []
         state.pendingQuestion = nil
-        for pill in Set(gone.map(\.pillId)) { syncPill(pill) }
+        for pill in Set(gone.map(\.pillId)) {
+            syncPill(pill)
+            clearPillBadge(id: pill)
+        }
     }
 
     /// Called by QuestionView "Reply in terminal" button: question `id` (the card's when nil)

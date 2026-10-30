@@ -624,7 +624,6 @@ struct QuestionView: View {
         .onChange(of: state.pendingQuestion) { _, _ in resetQuestionState() }
         // The next session's question can read the same as the one just answered.
         .onChange(of: state.waitingQuestions.first?.id) { _, _ in resetQuestionState() }
-        .onDisappear { HookServer.shared.releaseQuestionFD() }
     }
 
     private func resetQuestionState() {
