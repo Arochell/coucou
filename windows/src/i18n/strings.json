@@ -1202,6 +1202,36 @@
    "ko": "아래",
    "ja": "下"
   },
+  "Bottom left": {
+   "zh-Hans": "左下角",
+   "hi": "नीचे बाएँ",
+   "es": "Abajo a la izquierda",
+   "ar": "أسفل اليسار",
+   "fr": "En bas à gauche",
+   "bn": "নিচে বাঁয়ে",
+   "pt-BR": "Inferior esquerdo",
+   "ru": "Внизу слева",
+   "id": "Kiri bawah",
+   "de": "Unten links",
+   "tr": "Sol alt",
+   "ko": "왼쪽 아래",
+   "ja": "左下"
+  },
+  "Bottom right": {
+   "zh-Hans": "右下角",
+   "hi": "नीचे दाएँ",
+   "es": "Abajo a la derecha",
+   "ar": "أسفل اليمين",
+   "fr": "En bas à droite",
+   "bn": "নিচে ডানে",
+   "pt-BR": "Inferior direito",
+   "ru": "Внизу справа",
+   "id": "Kanan bawah",
+   "de": "Unten rechts",
+   "tr": "Sağ alt",
+   "ko": "오른쪽 아래",
+   "ja": "右下"
+  },
   "Bow": {
    "zh-Hans": "蝴蝶结",
    "hi": "बो",
@@ -4067,6 +4097,21 @@
    "ko": "중요",
    "ja": "重要"
   },
+  "In a corner, Coucou floats over your desktop and opens from there. You can also drag Mochi near a corner of the screen, or back to the top centre.": {
+   "zh-Hans": "放在角落时，Coucou 会浮在桌面上并从那里展开。你也可以把 Mochi 拖到屏幕角落附近，或拖回顶部中间。",
+   "hi": "कोने में Coucou आपके डेस्कटॉप पर तैरता है और वहीं से खुलता है। आप Mochi को स्क्रीन के किसी कोने के पास खींच सकते हैं, या वापस ऊपर बीच में ला सकते हैं।",
+   "es": "En una esquina, Coucou flota sobre tu escritorio y se abre desde ahí. También puedes arrastrar a Mochi cerca de una esquina de la pantalla, o devolverlo arriba en el centro.",
+   "ar": "في الزاوية، يطفو Coucou فوق سطح المكتب ويُفتح من هناك. يمكنك أيضًا سحب Mochi قرب زاوية من الشاشة، أو إعادته إلى أعلى الوسط.",
+   "fr": "Dans un coin, Coucou flotte sur ton bureau et s’ouvre depuis ce coin. Tu peux aussi glisser Mochi près d’un coin de l’écran, ou le ramener en haut au centre.",
+   "bn": "কোণে থাকলে Coucou আপনার ডেস্কটপের উপর ভাসে এবং সেখান থেকেই খোলে। Mochi-কে স্ক্রিনের কোনো কোণের কাছে টেনে আনতে পারেন, অথবা আবার উপরের মাঝখানে নিতে পারেন।",
+   "pt-BR": "Num canto, o Coucou flutua sobre a sua área de trabalho e abre a partir dali. Você também pode arrastar o Mochi para perto de um canto da tela, ou de volta ao centro, no alto.",
+   "ru": "В углу Coucou парит над рабочим столом и открывается оттуда. Можно также перетащить Mochi к углу экрана или обратно наверх по центру.",
+   "id": "Di sudut, Coucou melayang di atas desktop dan terbuka dari sana. Kamu juga bisa menyeret Mochi ke dekat sudut layar, atau kembali ke atas tengah.",
+   "de": "In einer Ecke schwebt Coucou über deinem Schreibtisch und öffnet sich von dort. Du kannst Mochi auch in die Nähe einer Bildschirmecke ziehen oder zurück nach oben in die Mitte.",
+   "tr": "Bir köşedeyken Coucou masaüstünün üzerinde süzülür ve oradan açılır. Mochi’yi ekranın bir köşesine yakın sürükleyebilir ya da üst ortaya geri getirebilirsin.",
+   "ko": "모서리에 두면 Coucou가 데스크톱 위에 떠 있고 그 자리에서 열려요. Mochi를 화면 모서리 근처로 끌어다 놓거나 상단 가운데로 다시 옮길 수도 있어요.",
+   "ja": "隅に置くと、Coucou はデスクトップの上に浮かび、そこから開きます。Mochi を画面の隅の近くへドラッグしたり、上部中央へ戻したりすることもできます。"
+  },
   "Inbox": {
    "zh-Hans": "收件箱",
    "hi": "इनबॉक्स",
@@ -6182,6 +6227,21 @@
    "ko": "노치",
    "ja": "ノッチ"
   },
+  "Notch (top centre)": {
+   "zh-Hans": "刘海（顶部居中）",
+   "hi": "नॉच (ऊपर बीच में)",
+   "es": "Notch (arriba en el centro)",
+   "ar": "النتوء (أعلى الوسط)",
+   "fr": "Notch (en haut au centre)",
+   "bn": "নচ (উপরে মাঝখানে)",
+   "pt-BR": "Notch (no alto, ao centro)",
+   "ru": "Вырез (вверху по центру)",
+   "id": "Notch (atas tengah)",
+   "de": "Notch (oben mittig)",
+   "tr": "Çentik (üst orta)",
+   "ko": "노치 (상단 가운데)",
+   "ja": "ノッチ（上部中央）"
+  },
   "Notch shortcuts — active when the notch is in front": {
    "zh-Hans": "岛快捷键 — 岛获得焦点时有效",
    "hi": "आइलैंड शॉर्टकट — आइलैंड फोकस में होने पर सक्रिय",
@@ -7366,6 +7426,21 @@
    "tr": "Özenli",
    "ko": "다듬어서",
    "ja": "丁寧"
+  },
+  "Position": {
+   "zh-Hans": "位置",
+   "hi": "स्थान",
+   "es": "Posición",
+   "ar": "الموضع",
+   "fr": "Position",
+   "bn": "অবস্থান",
+   "pt-BR": "Posição",
+   "ru": "Расположение",
+   "id": "Posisi",
+   "de": "Position",
+   "tr": "Konum",
+   "ko": "위치",
+   "ja": "位置"
   },
   "Preparing…": {
    "zh-Hans": "正在准备…",
@@ -9947,6 +10022,21 @@
    "ko": "최애 에이전트",
    "ja": "トップのエージェント"
   },
+  "Top left": {
+   "zh-Hans": "左上角",
+   "hi": "ऊपर बाएँ",
+   "es": "Arriba a la izquierda",
+   "ar": "أعلى اليسار",
+   "fr": "En haut à gauche",
+   "bn": "উপরে বাঁয়ে",
+   "pt-BR": "Superior esquerdo",
+   "ru": "Вверху слева",
+   "id": "Kiri atas",
+   "de": "Oben links",
+   "tr": "Sol üst",
+   "ko": "왼쪽 위",
+   "ja": "左上"
+  },
   "Top project": {
    "zh-Hans": "最活跃项目",
    "hi": "शीर्ष प्रोजेक्ट",
@@ -9961,6 +10051,21 @@
    "tr": "En çok çalışılan proje",
    "ko": "최애 프로젝트",
    "ja": "トップのプロジェクト"
+  },
+  "Top right": {
+   "zh-Hans": "右上角",
+   "hi": "ऊपर दाएँ",
+   "es": "Arriba a la derecha",
+   "ar": "أعلى اليمين",
+   "fr": "En haut à droite",
+   "bn": "উপরে ডানে",
+   "pt-BR": "Superior direito",
+   "ru": "Вверху справа",
+   "id": "Kanan atas",
+   "de": "Oben rechts",
+   "tr": "Sağ üst",
+   "ko": "오른쪽 위",
+   "ja": "右上"
   },
   "Transcript": {
    "zh-Hans": "转写",

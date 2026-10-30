@@ -8,13 +8,34 @@ struct IslandRootView: View {
     @EnvironmentObject var state: AppState
 
     var body: some View {
-        ZStack(alignment: .top) {
+        let placement = state.islandPlacement
+        ZStack(alignment: placement.alignment) {
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            IslandContainer(state: state)
-                .frame(maxWidth: .infinity, alignment: .center)
+            if placement.isCorner {
+                // Held by its corner: it grows away from it (IslandPlacement.islandRect).
+                IslandContainer(state: state)
+                    .padding(.horizontal, IslandPlacement.side)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: placement.alignment)
+            } else {
+                IslandContainer(state: state)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
         }
         .ignoresSafeArea()
+    }
+}
+
+extension IslandPlacement {
+    /// The panel corner the island is held by (top centre at the notch).
+    var alignment: Alignment {
+        switch self {
+        case .notch:       return .top
+        case .topLeft:     return .topLeading
+        case .topRight:    return .topTrailing
+        case .bottomLeft:  return .bottomLeading
+        case .bottomRight: return .bottomTrailing
+        }
     }
 }
 
@@ -60,6 +81,13 @@ struct IslandContainer: View {
                 // Hidden over a real notch: draw nothing. A black copy of the notch would slide
                 // away with the Space on a desktop swipe, while the real notch stays.
                 .fill(Color.black.opacity(state.mode == .hidden && state.hasNotch ? 0 : 1))
+                // Floating in a corner: a thin edge and a shadow lift it off the desktop.
+                .overlay(
+                    IslandShape(width: islandWidth, height: islandHeight,
+                                cornerRadius: cornerRadius, topRadius: islandTopRadius)
+                        .stroke(Color.white.opacity(state.islandPlacement.isCorner ? 0.09 : 0), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(state.islandPlacement.isCorner ? 0.45 : 0), radius: 14, y: 6)
 
             // Content
             if state.mode == .expanded {
@@ -143,7 +171,8 @@ struct IslandContainer: View {
                                     progress: state.uploadProgress,
                                     nw: state.notchWidth, nh: state.notchHeight)
             let cr  = newMode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
-            let tr: CGFloat = 0
+            // In a corner the island floats: its top corners are rounded too.
+            let tr: CGFloat = state.islandPlacement.isCorner ? cr : 0
             withAnimation(anim) {
                 islandWidth      = w
                 islandHeight     = (newMode == .expanded && state.view == .prompt) ? chatPromptHeight : h
@@ -177,7 +206,7 @@ struct IslandContainer: View {
             islandWidth      = w
             islandHeight     = state.view == .prompt ? chatPromptHeight : h
             cornerRadius     = state.mode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
-            islandTopRadius  = 0
+            islandTopRadius  = state.islandPlacement.isCorner ? cornerRadius : 0
         }
         .onReceive(NotificationCenter.default.publisher(for: .islandResize)) { _ in
             guard state.mode == .expanded, state.view != .prompt else { return }
@@ -199,6 +228,8 @@ struct IslandContainer: View {
                                     nw: state.notchWidth, nh: state.notchHeight)
             islandWidth  = w
             islandHeight = (state.mode == .expanded && state.view == .prompt) ? chatPromptHeight : h
+            // The notch ↔ a corner: flat or rounded top.
+            islandTopRadius = state.islandPlacement.isCorner ? cornerRadius : 0
         }
     }
 

@@ -301,6 +301,15 @@ Chaque jalon se termine par build + capture + comparaison aux références + com
 - Hidden = 0 % CPU ; compact < 3 % ; mémoire < 100 Mo.
 - La démo (⌃⌥⌘D) se filme d'une traite sans intervention.
 
+## 12 bis. Coucou dans un coin de l'écran
+
+Version GitHub : l'île peut vivre au notch (par défaut) ou dans un des quatre coins de son écran (`AppState.islandPlacement`, clé `islandPlacement` : `notch`, `topLeft`, `topRight`, `bottomLeft`, `bottomRight`).
+
+- **Où** : coins du haut juste sous la barre des menus, coins du bas juste au-dessus du Dock (`screen.visibleFrame`), à 10 pt des bords. La géométrie est dans `IslandPlacement` (pure, testée par `scripts/test-island-placement.sh`) : origine du panneau, rectangle de l'île dans le panneau, coin visé par un lâcher.
+- **Forme** : au repos, la petite barre d'un écran sans notch (80 × 24 pt, Mochi visible), coins du haut arrondis aussi, fin liseré et ombre. Ouverte, elle grandit depuis son coin : vers le bas en haut, vers le haut en bas, vers la droite à gauche, vers la gauche à droite. Toutes les vues sont les mêmes.
+- **Choisir** : Réglages → Général → Affichage → Position, ou glisser Mochi et le lâcher à moins de 180 pt d'un coin de l'écran (ou en haut au centre pour revenir au notch). Son `pop`, émote `happy`.
+- **Suivent l'île** : le suivi des yeux, Mochi sur le bureau (départ et retour), les sous-titres de la voix (sous l'île en haut, au-dessus en bas), la zone de survol et les clics.
+
 ## 13. Mochi sur le bureau
 
 Mochi peut quitter l'island et vivre comme une icône flottante sur le bureau. Il conserve tout son comportement (tenue, émotes, suivi des yeux, danse) et réagit aux alertes.

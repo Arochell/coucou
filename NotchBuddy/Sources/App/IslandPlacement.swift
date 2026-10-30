@@ -1,0 +1,61 @@
+import Foundation
+
+/// Where the island lives: at the notch (top centre), or in one of the screen's four corners.
+/// In a corner it is a small floating pill that opens from its corner, downwards from the top
+/// corners (just under the menu bar), upwards from the bottom ones (just above the Dock).
+///
+/// Pure geometry (tested by scripts/test-island-placement.sh). AppKit coordinates: y goes up.
+enum IslandPlacement: String, CaseIterable, Sendable {
+    case notch, topLeft, topRight, bottomLeft, bottomRight
+
+    var isCorner: Bool { self != .notch }
+    var isBottom: Bool { self == .bottomLeft || self == .bottomRight }
+    var isLeft: Bool { self == .topLeft || self == .bottomLeft }
+    var isRight: Bool { self == .topRight || self == .bottomRight }
+
+    /// Room the corner island keeps from the screen's edges (inside the visible frame).
+    static let margin: CGFloat = 10
+    /// The island panel is wider than the open island; this much empty room on each side
+    /// (Mochi's hearts, the shadow). Same value as (panel width − open width) / 2.
+    static let side: CGFloat = 40
+    /// A drop of Mochi this close to a corner of the screen moves the island there.
+    static let snapDistance: CGFloat = 180
+
+    /// The panel's origin on the screen. `screen` is the screen's frame, `visible` its visible
+    /// frame (without the menu bar and the Dock).
+    func panelOrigin(screen: CGRect, visible: CGRect, panelSize: CGSize) -> CGPoint {
+        let m = Self.margin, s = Self.side
+        switch self {
+        case .notch:       return CGPoint(x: screen.midX - panelSize.width / 2, y: screen.maxY - panelSize.height)
+        case .topLeft:     return CGPoint(x: visible.minX + m - s, y: visible.maxY - m - panelSize.height)
+        case .topRight:    return CGPoint(x: visible.maxX - m + s - panelSize.width, y: visible.maxY - m - panelSize.height)
+        case .bottomLeft:  return CGPoint(x: visible.minX + m - s, y: visible.minY + m)
+        case .bottomRight: return CGPoint(x: visible.maxX - m + s - panelSize.width, y: visible.minY + m)
+        }
+    }
+
+    /// The island's rect inside the panel (panel coordinates, y up) for an island of `size`:
+    /// centred at the top for the notch, held by its corner otherwise.
+    func islandRect(panelSize: CGSize, size: CGSize) -> CGRect {
+        let x: CGFloat
+        if isLeft { x = Self.side }
+        else if isRight { x = panelSize.width - Self.side - size.width }
+        else { x = (panelSize.width - size.width) / 2 }
+        let y = isBottom ? 0 : panelSize.height - size.height
+        return CGRect(x: x, y: y, width: size.width, height: size.height)
+    }
+
+    /// Where Mochi dropped at `point` sends the island: a corner when the drop is near one,
+    /// the notch when it is near the top centre, else nil (the drop does what it did before).
+    static func snap(_ point: CGPoint, screen: CGRect) -> IslandPlacement? {
+        let d = snapDistance
+        let nearLeft = point.x - screen.minX < d, nearRight = screen.maxX - point.x < d
+        let nearTop = screen.maxY - point.y < d, nearBottom = point.y - screen.minY < d
+        if nearTop && nearLeft { return .topLeft }
+        if nearTop && nearRight { return .topRight }
+        if nearBottom && nearLeft { return .bottomLeft }
+        if nearBottom && nearRight { return .bottomRight }
+        if screen.maxY - point.y < 90 && abs(point.x - screen.midX) < 220 { return .notch }
+        return nil
+    }
+}

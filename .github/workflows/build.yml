@@ -30,6 +30,9 @@ jobs:
       - name: Test display choice
         run: bash scripts/test-display-choice.sh
 
+      - name: Test island placement (notch and the four corners)
+        run: bash scripts/test-island-placement.sh
+
       - name: Test parallel Claude Code sessions
         run: bash scripts/test-session-registry.sh
 
