@@ -188,7 +188,7 @@ extension MailReason {
     }
 }
 
-extension MailField {
+extension MailRuleField {
     var title: String {
         switch self {
         case .sender: return String(localized: "hub.mail.field.sender")
@@ -220,7 +220,7 @@ private struct MailAutoSortHint: View {
 
 struct HubMailRulesPage: View {
     @ObservedObject private var store = MailTriageStore.shared
-    @State private var field: MailField = .sender
+    @State private var field: MailRuleField = .sender
     @State private var value = ""
     @State private var kind: Kind = .junk
     @State private var mailbox = ""
@@ -250,7 +250,7 @@ struct HubMailRulesPage: View {
                         .font(.system(size: 13, weight: .semibold))
                         .frame(width: 44, alignment: .leading)
                     Picker("", selection: $field) {
-                        ForEach(MailField.allCases, id: \.self) { f in Text(f.title).tag(f) }
+                        ForEach(MailRuleField.allCases, id: \.self) { f in Text(f.title).tag(f) }
                     }
                     .labelsHidden()
                     .frame(width: 170)

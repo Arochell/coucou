@@ -8,12 +8,12 @@ import Foundation
 
 /// What a rule looks at. `contains` everywhere, ignoring case and accents; `domain` is the end
 /// of the sender's address.
-enum MailField: String, Codable, CaseIterable, Sendable {
+enum MailRuleField: String, Codable, CaseIterable, Sendable {
     case sender, domain, subject, text, account
 }
 
 struct MailCondition: Codable, Equatable, Sendable {
-    var field: MailField
+    var field: MailRuleField
     var value: String
 }
 
