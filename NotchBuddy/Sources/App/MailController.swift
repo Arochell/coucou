@@ -126,6 +126,10 @@ final class MailController: ObservableObject {
             guard bundleId == Self.bundleId else { return }
             Task { @MainActor [weak self] in
                 self?.isMailRunning = true
+                // Mail just opened: it syncs its accounts first (a minute or two of full CPU on
+                // a big inbox). Coucou waits 30 s before its first read instead of adding to it.
+                try? await Task.sleep(for: .seconds(30))
+                guard Self.mailRunning() else { return }
                 self?.updatePolling()
             }
         })
