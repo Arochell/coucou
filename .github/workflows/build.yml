@@ -51,6 +51,9 @@ jobs:
       - name: Test Mail triage (rules, banned words, VIPs, search)
         run: bash scripts/test-mail-triage.sh
 
+      - name: Test the settings search (accents, words, labels)
+        run: bash scripts/test-settings-search.sh
+
       - name: Test Flow dictation keys
         run: bash scripts/test-flow-keys.sh
 

@@ -5822,6 +5822,21 @@
    "ko": "아직 규칙이 없습니다. 예: 보낸 사람에 ‘newsletter’가 있으면 정크로 이동.",
    "ja": "ルールはまだありません。例：差出人に「newsletter」を含む場合、迷惑メールへ移動。"
   },
+  "No setting found": {
+   "zh-Hans": "未找到设置",
+   "hi": "कोई सेटिंग नहीं मिली",
+   "es": "Ningún ajuste encontrado",
+   "ar": "لم يُعثر على أي إعداد",
+   "fr": "Aucun réglage trouvé",
+   "bn": "কোনো সেটিং পাওয়া যায়নি",
+   "pt-BR": "Nenhum ajuste encontrado",
+   "ru": "Настройка не найдена",
+   "id": "Pengaturan tidak ditemukan",
+   "de": "Keine Einstellung gefunden",
+   "tr": "Ayar bulunamadı",
+   "ko": "찾은 설정이 없어요",
+   "ja": "該当する設定はありません"
+  },
   "No snippet yet. Your booking link, your signature, your address: say a few words, get the whole text.": {
    "zh-Hans": "还没有片段。你的预约链接、签名、地址：说几个字，就能得到整段文字。",
    "hi": "अभी कोई स्निपेट नहीं। आपका बुकिंग लिंक, हस्ताक्षर, पता: कुछ शब्द बोलें, पूरा टेक्स्ट पाएँ।",
@@ -8341,6 +8356,21 @@
    "tr": "Diktelerde ara",
    "ko": "받아쓰기 검색",
    "ja": "口述を検索"
+  },
+  "Search settings": {
+   "zh-Hans": "搜索设置",
+   "hi": "सेटिंग खोजें",
+   "es": "Buscar un ajuste",
+   "ar": "البحث في الإعدادات",
+   "fr": "Rechercher un réglage",
+   "bn": "সেটিংস খুঁজুন",
+   "pt-BR": "Buscar ajustes",
+   "ru": "Поиск настроек",
+   "id": "Cari pengaturan",
+   "de": "Einstellungen suchen",
+   "tr": "Ayarlarda ara",
+   "ko": "설정 검색",
+   "ja": "設定を検索"
   },
   "Searches": {
    "zh-Hans": "搜索",
