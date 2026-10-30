@@ -7,11 +7,13 @@ import SwiftUI
 enum HubPage: String, CaseIterable, Identifiable {
     case dictation, notes, insights, dictionary, snippets, styles, settings
     case general, pills, agents, chat, integrations, voice, shortcuts
+    case mailOverview, mailRules, mailBanned, mailVIP
 
     var id: String { rawValue }
 
     static let flowPages: [HubPage] = [.dictation, .notes, .insights, .dictionary, .snippets, .styles, .settings]
     static let notchPages: [HubPage] = [.general, .pills, .agents, .chat, .integrations, .voice, .shortcuts]
+    static let mailPages: [HubPage] = [.mailOverview, .mailRules, .mailBanned, .mailVIP]
 
     /// The section of Settings this page shows, for the notch's pages.
     var settingsSection: String? {
@@ -48,6 +50,10 @@ enum HubPage: String, CaseIterable, Identifiable {
         case .snippets:   return String(localized: "hub.page.snippets")
         case .styles:     return String(localized: "hub.page.styles")
         case .settings:   return String(localized: "hub.page.settings")
+        case .mailOverview: return String(localized: "hub.mail.overview")
+        case .mailRules:    return String(localized: "hub.mail.rules")
+        case .mailBanned:   return String(localized: "hub.mail.banned")
+        case .mailVIP:      return String(localized: "hub.mail.vip")
         }
     }
 
@@ -67,6 +73,10 @@ enum HubPage: String, CaseIterable, Identifiable {
         case .integrations: return "puzzlepiece.extension"
         case .voice:        return "waveform"
         case .shortcuts:    return "keyboard"
+        case .mailOverview: return "tray"
+        case .mailRules:    return "line.3.horizontal.decrease"
+        case .mailBanned:   return "nosign"
+        case .mailVIP:      return "star"
         }
     }
 }
@@ -231,6 +241,10 @@ struct FlowHubView: View {
         case .snippets:   HubSnippetsPage()
         case .styles:     HubStylesPage(router: router)
         case .settings:   HubSettingsPage()
+        case .mailOverview: HubMailOverviewPage()
+        case .mailRules:    HubMailRulesPage()
+        case .mailBanned:   HubMailBannedPage()
+        case .mailVIP:      HubMailVIPPage()
         default:
             if let section = router.page.settingsSection {
                 VStack(alignment: .leading, spacing: 0) {
@@ -275,6 +289,11 @@ private struct HubSidebar: View {
                     HubSidebarHeader(text: String(localized: "hub.section.notch"))
                         .padding(.top, 14)
                     ForEach(HubPage.notchPages) { page in
+                        HubSidebarItem(page: page, selected: router.page == page) { router.page = page }
+                    }
+                    HubSidebarHeader(text: "Mail")
+                        .padding(.top, 14)
+                    ForEach(HubPage.mailPages) { page in
                         HubSidebarItem(page: page, selected: router.page == page) { router.page = page }
                     }
                 }

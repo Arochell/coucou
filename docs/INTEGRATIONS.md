@@ -320,6 +320,21 @@ Réglages → Chat → Local models → **Disconnect**. Efface l'URL sauvegardé
   Le `delay` laisse le temps à la pièce jointe d'être prise en compte (comportement connu de Mail). `Info.plist` : `NSAppleEventsUsageDescription`.
 - Succès : vue `note` « Mail envoyé à … », émote Clin d'œil, son `send`. Échec : état `error` avec la raison.
 
+### Pill Mail : recherche et filtres
+
+- Loupe dans l'en-tête de la carte : un champ de recherche. Mots libres (objet ou expéditeur), `de:` / `from:` pour l'expéditeur, `objet:` / `subject:` pour l'objet, guillemets pour une phrase (`MailQuery.parse`).
+- Filtres rapides sous l'en-tête : Tous · Non lus · Importants (drapeau de Mail) · Aujourd'hui. La recherche et le filtre deviennent une clause `whose` AppleScript sur la boîte de réception de chaque compte (`MailScript.whoseClause`, `MailScript.searchScript`), 60 résultats au plus, les plus récents d'abord.
+- « Voir plus » au bas de la liste : 12 mails de plus à chaque clic, jusqu'à 60.
+- Détail d'un mail : Important / Pas important (drapeau), Indésirable, et dans « … » : Toujours important (VIP), Toujours ignorer cet expéditeur (son adresse devient un mot banni).
+
+### Section Mail de la fenêtre Coucou (tri automatique)
+
+- Quatre pages, après Flow et Notch : Aperçu, Règles, Mots bannis, VIP. Réglages et journal en JSON dans `Application Support/NotchBuddy/Mail` (`MailTriageStore`).
+- Tri automatique, désactivé par défaut. Une fois activé, seuls les mails arrivés après l'activation sont regardés (`autoSortSince`), chacun une seule fois (`seen.json`). Le relevé de Mail tourne alors toutes les 60 s même si la pill est éteinte, seulement quand Mail est ouvert.
+- Ordre de décision (`MailTriage.decide`) : VIP (drapeau, jamais déplacé) → mots bannis dans l'expéditeur, l'objet ou le texte, mots entiers (indésirables) → règles dans l'ordre, la première qui correspond gagne. Le texte n'est lu que si un mot banni ou une règle « Texte » en a besoin (4 000 caractères).
+- Actions possibles : indésirables (statut indésirable + déplacement dans la boîte Junk/Spam du compte), important (drapeau), marquer comme lu, déplacer dans un dossier. Jamais de suppression.
+- Journal : chaque action avec sa raison et un bouton Annuler, qui retrouve le mail par son Message-ID (l'id de Mail change quand un mail est déplacé) et le remet en place.
+
 ---
 
 ## 6bis. WhatsApp (expérimental, build GitHub uniquement)

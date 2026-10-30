@@ -13,10 +13,12 @@ private let mailAccent = "#2F8CFF"
 struct MailCardView: View {
     @ObservedObject private var mail = MailController.shared
     @State private var openId: String? = nil
+    @State private var searchOpen = false
+    @FocusState private var searchFocused: Bool
 
     private var openMessage: MailMessage? {
         guard let openId else { return nil }
-        return mail.messages.first { $0.id == openId }
+        return mail.displayed.first { $0.id == openId }
     }
 
     var body: some View {
@@ -47,25 +49,75 @@ struct MailCardView: View {
                 Text("Inbox")
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex: "#8E939C"))
-                if let unread = mail.unreadCount, unread > 0 {
-                    Text(String(format: String(localized: "%lld unread"), Int64(unread)))
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Color(hex: mailAccent))
-                        .monospacedDigit()
-                        .padding(.horizontal, 6).padding(.vertical, 1)
-                        .background(Color(hex: mailAccent).opacity(0.14))
-                        .clipShape(Capsule())
+                if searchOpen {
+                    // The search: free words, or "from:" / "subject:" (MailQuery).
+                    TextField(String(localized: "mail.search.placeholder"), text: $mail.query)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(hex: "#E8E9EC"))
+                        .focused($searchFocused)
+                        .onSubmit { mail.runSearch() }
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) { searchOpen = false }
+                        mail.clearSearch()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hex: "#6B7079"))
+                    }
+                    .buttonStyle(.plain)
+                    .help(String(localized: "Close"))
+                } else {
+                    if let unread = mail.unreadCount, unread > 0 {
+                        Text(String(format: String(localized: "%lld unread"), Int64(unread)))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Color(hex: mailAccent))
+                            .monospacedDigit()
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(Color(hex: mailAccent).opacity(0.14))
+                            .clipShape(Capsule())
+                    }
+                    Spacer(minLength: 2)
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) { searchOpen = true }
+                        searchFocused = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Color(hex: "#8E939C"))
+                            .frame(width: 18, height: 16)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(String(localized: "mail.search.help"))
                 }
-                Spacer(minLength: 2)
             }
             .padding(.top, 6)
             .padding(.leading, 108)
             .padding(.trailing, 36)
 
+            // Quick filters: All, Unread, Important, Today.
+            HStack(spacing: 4) {
+                ForEach(MailFilter.allCases, id: \.self) { f in
+                    MailFilterChip(title: f.title, on: mail.filter == f) { mail.setFilter(f) }
+                }
+                if mail.searching {
+                    Text("mail.searching")
+                        .font(.system(size: 9.5))
+                        .foregroundColor(Color(hex: "#6B7079"))
+                        .padding(.leading, 4)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 4)
+            .padding(.leading, 108)
+            .padding(.trailing, 12)
+
             // Message rows: three in view, the rest a scroll away.
-            if mail.messages.isEmpty {
+            if mail.displayed.isEmpty {
                 Group {
-                    if mail.loaded { Text("No messages") } else { Text("Loading…") }
+                    if mail.results != nil { Text("mail.no-results") }
+                    else if mail.loaded { Text("No messages") } else { Text("Loading…") }
                 }
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex: "#6B7079"))
@@ -74,12 +126,22 @@ struct MailCardView: View {
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 3) {
-                        ForEach(mail.messages) { message in
+                        ForEach(mail.displayed) { message in
                             MailRow(message: message) {
                                 withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                                     openId = message.id
                                 }
                             }
+                        }
+                        if mail.results == nil && mail.messages.count >= mail.shownCount
+                            && mail.shownCount < MailController.maxShown {
+                            Button { mail.loadMore() } label: {
+                                Text("mail.load-more")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(Color(hex: mailAccent).opacity(0.9))
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -113,6 +175,11 @@ private struct MailRow: View {
                     .lineLimit(1).truncationMode(.tail)
                     .frame(maxWidth: 82, alignment: .leading)
                     .layoutPriority(1)
+                if message.isFlagged {
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: 7.5))
+                        .foregroundColor(Color(hex: "#F5A524"))
+                }
                 Text(message.timeAgo)
                     .font(.system(size: 10))
                     .foregroundColor(Color(hex: "#6B7079"))
@@ -135,6 +202,38 @@ private struct MailRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
+    }
+}
+
+/// A quick filter of the Mail card: a small word, filled when it is on.
+private struct MailFilterChip: View {
+    let title: String
+    let on: Bool
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 9.5, weight: on ? .semibold : .regular))
+                .foregroundColor(Color(hex: on ? "#E8E9EC" : (hovered ? "#B0B5BE" : "#6B7079")))
+                .padding(.horizontal, 7).padding(.vertical, 2)
+                .background(Capsule().fill(on ? Color(hex: mailAccent).opacity(0.22) : Color.white.opacity(hovered ? 0.06 : 0)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+    }
+}
+
+extension MailFilter {
+    var title: String {
+        switch self {
+        case .all: return String(localized: "mail.filter.all")
+        case .unread: return String(localized: "mail.filter.unread")
+        case .flagged: return String(localized: "mail.filter.flagged")
+        case .today: return String(localized: "mail.filter.today")
+        }
     }
 }
 
@@ -210,6 +309,29 @@ struct MailDetailView: View {
                     Button("Mark as read") { mail.markAsRead(message) }
                         .foregroundColor(Color(hex: "#8E939C"))
                 }
+                Button(message.isFlagged ? String(localized: "mail.not-important") : String(localized: "mail.important")) {
+                    mail.toggleFlag(message)
+                }
+                .foregroundColor(Color(hex: "#F5A524").opacity(0.9))
+                Button(String(localized: "mail.junk")) {
+                    mail.moveToJunk(message)
+                    onClose()
+                }
+                .foregroundColor(Color(hex: "#8E939C"))
+                Menu {
+                    Button(String(localized: "mail.make-vip")) { mail.makeVIP(message) }
+                    Button(String(localized: "mail.ignore-sender")) {
+                        mail.ignoreSender(message)
+                        onClose()
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color(hex: "#8E939C"))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
             }
             .font(.system(size: 11, weight: .medium))
             .buttonStyle(.plain)
