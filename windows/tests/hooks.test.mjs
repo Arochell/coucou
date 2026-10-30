@@ -179,6 +179,17 @@ test("a session finishing behind another pill only badges its own, for 5.2 s", (
   assert.equal(task().pillBadge, null);
 });
 
+test("alertsFromAllPills: unfocused pill alert opens the island and restores focus after 5.2 s", () => {
+  State.settings.alertsFromAllPills = true;
+  State.setFocus("integration_n8n");
+  hook({ hook_event_name: "Stop" });
+  assert.equal(State.focusId, "integration_claude");
+  assert.deepEqual(asked, ["alert:finished"]);
+  seconds(5.2);
+  assert.equal(State.focusId, "integration_n8n");
+  State.settings.alertsFromAllPills = false;
+});
+
 test("a failed stop shows the error view, or the error badge behind another pill", () => {
   hook({ hook_event_name: "StopFailure" });
   assert.equal(task().state, "error");

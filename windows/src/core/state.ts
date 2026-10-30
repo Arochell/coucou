@@ -103,6 +103,8 @@ export interface Settings {
   autoCloseInterval: number;
   /** Hovering the island opens it all the way (off: hovering only peeks). */
   openOnHover: boolean;
+  /** Open the island for a moment when any pill finishes or hits an error. */
+  alertsFromAllPills: boolean;
   /** Date and time in the middle of the compact island. */
   showClock: boolean;
   absenceInterval: number;
@@ -173,6 +175,7 @@ export const DEFAULT_SETTINGS: Settings = {
   soundVolume: 0.12,
   autoCloseInterval: 15,
   openOnHover: false,
+  alertsFromAllPills: false,
   showClock: false,
   absenceInterval: 180,
   activeIntegrations: [
