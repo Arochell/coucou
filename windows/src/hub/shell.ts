@@ -13,7 +13,8 @@ import { icon, keyLabel } from "./ui";
 
 export type PageId =
   | "dictation" | "notes" | "insights" | "dictionary" | "snippets" | "styles" | "flowsettings"
-  | "general" | "pills" | "agents" | "chat" | "voice" | "integrations" | "phone" | "shortcuts";
+  | "general" | "pills" | "agents" | "chat" | "voice" | "integrations" | "phone" | "shortcuts"
+  | "mailOverview" | "mailRules" | "mailBanned" | "mailVIP";
 
 interface PageDef {
   id: PageId;
@@ -44,7 +45,15 @@ export const NOTCH_PAGES: PageDef[] = [
   { id: "shortcuts", icon: "keyboard", title: () => t("Shortcuts"), subtitle: () => t("The keys that open the island and its actions.") },
 ];
 
-const ALL = [...FLOW_PAGES, ...NOTCH_PAGES];
+/** Mail (classic Outlook): Windows only, Linux has no Outlook. */
+export const MAIL_PAGES: PageDef[] = [
+  { id: "mailOverview", icon: "tray", title: () => t("Overview") },
+  { id: "mailRules", icon: "filter", title: () => t("Rules") },
+  { id: "mailBanned", icon: "nosign", title: () => t("Banned words") },
+  { id: "mailVIP", icon: "star", title: () => t("VIP") },
+];
+
+const ALL = [...FLOW_PAGES, ...NOTCH_PAGES, ...MAIL_PAGES];
 
 /** What a page gets to draw itself and reach the rest of the window. */
 export interface HubContext {
@@ -175,6 +184,7 @@ export async function startHub(root: HTMLElement, opts: HubOptions) {
   };
   group("Flow", FLOW_PAGES);
   group(t("Notch"), NOTCH_PAGES);
+  if (status.platform === "windows") group("Mail", MAIL_PAGES);
   side.append(h("div", { class: "spacer" }), statusLine, h("div", { class: "hub-version", text: `Coucou ${opts.version}` }));
 
   clear(root);

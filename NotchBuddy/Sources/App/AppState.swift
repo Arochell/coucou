@@ -121,6 +121,10 @@ final class AppState: ObservableObject {
     }
 
     // In-chat provider + model — picked via the model selector in the prompt view
+    /// The chat's Mail switch (GitHub build): the AI sees the latest messages and may prepare
+    /// actions on them. Off at each launch.
+    @Published var chatMailMode = false
+
     @Published var chatProvider: ChatProvider = .anthropic {
         didSet { UserDefaults.standard.set(chatProvider.rawValue, forKey: "chatProvider") }
     }

@@ -179,6 +179,16 @@ struct IslandContainer: View {
             cornerRadius     = state.mode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
             islandTopRadius  = 0
         }
+        .onReceive(NotificationCenter.default.publisher(for: .islandResize)) { _ in
+            guard state.mode == .expanded, state.view != .prompt else { return }
+            let (w, h) = islandSize(mode: .expanded, view: state.view,
+                                    progress: state.uploadProgress,
+                                    nw: state.notchWidth, nh: state.notchHeight)
+            withAnimation(openSpring) {
+                islandWidth  = w
+                islandHeight = h
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .botGreet)) { _ in
             greetNotif.toggle()
         }
@@ -483,6 +493,9 @@ struct CountdownBar: View {
 
 struct IslandContentView: View {
     @ObservedObject var state: AppState
+    /// A mail open in the Mail card: the home view grows by this much, downwards only
+    /// (the header and the pills stay where they are).
+    @State private var mailExtra: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -506,7 +519,8 @@ struct IslandContentView: View {
                         // but stop their endless animations: nobody sees them.
                         .environment(\.islandViewActive, active)
                         .frame(maxWidth: .infinity)
-                        .frame(height: isTall ? nil : 98)
+                        .frame(height: isTall ? nil : (v == .overview ? 98 + mailExtra : 98),
+                               alignment: v == .overview ? .top : .center)
                         .frame(minHeight: (isTall && !active) ? 0 : nil, maxHeight: isTall ? .infinity : nil)
                         .opacity(active ? 1 : 0)
                         .scaleEffect(active ? 1 : 0.97)
@@ -520,6 +534,11 @@ struct IslandContentView: View {
         .padding(.top, 8)
         .padding(.bottom, 10)
         .foregroundColor(Color(hex: "#F5F6F8"))
+        .onReceive(NotificationCenter.default.publisher(for: .islandResize)) { _ in
+            let extra = max(0, (MailLayout.detailHeight ?? 160) - 160)
+            // The island's own spring (IslandContainer.openSpring): the card and the island move together.
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { mailExtra = extra }
+        }
     }
 }
 

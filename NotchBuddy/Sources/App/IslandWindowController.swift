@@ -2047,6 +2047,14 @@ extension Notification.Name {
     static let openWardrobeFromDesktop = Notification.Name("notchBuddy.openWardrobeFromDesktop")
     // Island moved to another screen (resting size may differ: notch vs bar)
     static let islandScreenChanged = Notification.Name("notchBuddy.islandScreenChanged")
+    // A card asked for another height (MailLayout): resize the open island
+    static let islandResize = Notification.Name("notchBuddy.islandResize")
+}
+
+/// The home view grows while a mail is open in the Mail card, so it can be read.
+enum MailLayout {
+    nonisolated(unsafe) static var detailHeight: CGFloat?
+    static let readingHeight: CGFloat = 280
 }
 
 // MARK: - islandSize (takes real notch dimensions)
@@ -2061,6 +2069,9 @@ func islandSize(mode: IslandMode, view: IslandView,
     case .expanded:
         let layout = IslandConst.viewLayouts[view]!
         if view == .question, let h = QuestionLayout.height {
+            return (IslandConst.expandedWidth, h)
+        }
+        if view == .overview, let h = MailLayout.detailHeight {
             return (IslandConst.expandedWidth, h)
         }
         return (IslandConst.expandedWidth, layout.height)
