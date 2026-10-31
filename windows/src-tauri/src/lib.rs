@@ -339,8 +339,8 @@ fn open_session(session_id: Option<String>, path: Option<String>) -> bool {
     }
 }
 
-/// The Claude Desktop pill's target: the Claude app (Windows only — it has no
-/// Linux build).
+/// The Claude Desktop pill's target: the Claude app (Windows, and Linux with
+/// Anthropic's .deb).
 #[tauri::command]
 fn open_claude_desktop() -> bool {
     platform::open_claude_desktop()

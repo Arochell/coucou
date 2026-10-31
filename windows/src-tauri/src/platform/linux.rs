@@ -314,11 +314,54 @@ pub fn find_on_path(stem: &str) -> Option<PathBuf> {
 
 // ── Session windows ("Open terminal") ─────────────────────────────────────────
 //
-// Finding and raising a session's window lives in linux_focus.rs. There is no
-// Claude desktop app for Linux.
+// Finding and raising a session's window lives in linux_focus.rs.
 
+/// The Claude desktop app on Linux: launched via its desktop entry
+/// (installed by Anthropic's official .deb package as claude-desktop.desktop),
+/// directly by executable, or via its registered claude:// scheme handler.
 pub fn open_claude_desktop() -> bool {
-    false
+    open_claude_with(
+        || {
+            // gtk-launch itself starts fine whether the entry exists or not:
+            // look for the entry first, or the fallbacks below never run.
+            desktop_entry_exists("claude-desktop.desktop")
+                && no_console(Command::new("gtk-launch").arg("claude-desktop")).spawn().is_ok()
+        },
+        || {
+            let candidates = [
+                find_on_path("claude-desktop"),
+                Some(PathBuf::from("/usr/bin/claude-desktop")),
+                Some(PathBuf::from("/opt/Claude/claude-desktop")),
+                Some(PathBuf::from("/opt/Claude/claude")),
+                Some(home_dir().join(".local/bin/claude-desktop")),
+            ];
+            for path in candidates.into_iter().flatten() {
+                if path.is_file() && no_console(&mut Command::new(path)).spawn().is_ok() {
+                    return true;
+                }
+            }
+            false
+        },
+        || no_console(Command::new("xdg-open").arg("claude://")).spawn().is_ok(),
+    )
+}
+
+/// A desktop entry with this file name in the system's or the user's
+/// applications folders (XDG_DATA_HOME, then XDG_DATA_DIRS).
+fn desktop_entry_exists(file: &str) -> bool {
+    let dirs = std::env::var("XDG_DATA_DIRS").unwrap_or_default();
+    let system = if dirs.trim().is_empty() { "/usr/local/share:/usr/share".to_string() } else { dirs };
+    std::iter::once(xdg("XDG_DATA_HOME", ".local/share"))
+        .chain(std::env::split_paths(&system))
+        .any(|dir| dir.join("applications").join(file).is_file())
+}
+
+fn open_claude_with(
+    desktop: impl FnOnce() -> bool,
+    binary: impl FnOnce() -> bool,
+    protocol: impl FnOnce() -> bool,
+) -> bool {
+    desktop() || binary() || protocol()
 }
 
 /// Where a CLI such as `codex` or `claude` may be, best first: $PATH, then the
@@ -1020,4 +1063,38 @@ fn apply_rects(gw: &impl IsA<gtk::Widget>, rects: &[(f64, f64, f64, f64)]) {
         ));
     }
     gdk_window.input_shape_combine_region(&region, 0, 0);
+}
+
+#[cfg(test)]
+mod claude_launch_tests {
+    use super::open_claude_with;
+    use std::cell::RefCell;
+
+    #[test]
+    fn tries_launchers_in_order_and_stops_after_success() {
+        for (desktop, binary, protocol, expected, calls) in [
+            (true, true, true, true, vec!["desktop"]),
+            (false, true, true, true, vec!["desktop", "binary"]),
+            (false, false, true, true, vec!["desktop", "binary", "protocol"]),
+            (false, false, false, false, vec!["desktop", "binary", "protocol"]),
+        ] {
+            let seen = RefCell::new(Vec::new());
+            let result = open_claude_with(
+                || {
+                    seen.borrow_mut().push("desktop");
+                    desktop
+                },
+                || {
+                    seen.borrow_mut().push("binary");
+                    binary
+                },
+                || {
+                    seen.borrow_mut().push("protocol");
+                    protocol
+                },
+            );
+            assert_eq!(result, expected);
+            assert_eq!(seen.into_inner(), calls);
+        }
+    }
 }
