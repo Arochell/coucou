@@ -516,7 +516,8 @@ struct QuestionView: View {
                             .font(.system(size: 12))
                             .foregroundColor(Color(hex: "#F5F6F8"))
                             .focused($otherFieldFocused)
-                            .disableWritingTools()
+                            // No Writing Tools button on the island's fields: it lands near the notch (#936).
+                            .writingToolsBehavior(.disabled)
                             .onAppear { otherFieldFocused = true }
                             .onSubmit { commitOtherAndProceed(q: q, qi: qi, isLast: isLast) }
                             .onExitCommand { if qi < showOther.count { showOther[qi] = false } }
@@ -1501,7 +1502,8 @@ struct PromptView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
                         .focused($focused)
-                        .disableWritingTools()
+                        // No Writing Tools button on the island's fields: it lands near the notch (#936).
+                        .writingToolsBehavior(.disabled)
                         .onSubmit { sendMessage() }
 
                     #if !APPSTORE
@@ -5325,22 +5327,5 @@ extension Color {
             green: min(1, Double(components.greenComponent) + amount),
             blue: min(1, Double(components.blueComponent) + amount)
         )
-    }
-}
-
-// MARK: - Writing Tools Compatibility
-
-extension View {
-    @ViewBuilder
-    fileprivate func disableWritingTools() -> some View {
-        #if compiler(>=6.0)
-        if #available(macOS 15.0, *) {
-            self.writingToolsBehavior(.disabled)
-        } else {
-            self
-        }
-        #else
-        self
-        #endif
     }
 }
