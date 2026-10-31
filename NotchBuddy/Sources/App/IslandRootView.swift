@@ -399,6 +399,9 @@ struct BotPlacement: View {
                     .blur(radius: 6)
                     .opacity(botGlowOpacity(state.effectiveState))
                     .position(x: cx, y: cy)
+                    // The same spring as Mochi: the halo stays on him while he moves.
+                    .animation(.spring(response: 0.5, dampingFraction: damping), value: cx)
+                    .animation(.spring(response: 0.5, dampingFraction: damping), value: cy)
                     .animation(.easeInOut(duration: 0.4), value: state.effectiveState)
             }
 

@@ -36,7 +36,7 @@ struct CornerArcView: View {
     static let smallBody: CGFloat = 24
     static let swapDuration: Double = 0.5
     /// The tapped one's circle draws itself out first, this long, then the two fly.
-    static let ringOutDuration: Double = 0.2
+    static let ringOutDuration: Double = 0.24
 
     private var arcTasks: [AgentTask] {
         let focus = state.focusTask?.id
@@ -121,7 +121,7 @@ struct CornerArcView: View {
         if index < ids.count { ids[index] = focus.id }
         // First its circle and its name go (from the top down both sides)…
         pendingTap = task.id
-        ringOff.insert(task.id)
+        withAnimation(.easeInOut(duration: Self.ringOutDuration)) { _ = ringOff.insert(task.id) }
         SoundEngine.shared.play("blip")
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.ringOutDuration) {
             guard pendingTap == task.id else { return }
@@ -148,7 +148,9 @@ struct CornerArcView: View {
             ringOff.insert(s.outgoing.id)
         }
         // The one that left the corner has reached its place: its circle draws itself in.
-        DispatchQueue.main.async { ringOff.remove(s.outgoing.id) }
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.35)) { _ = ringOff.remove(s.outgoing.id) }
+        }
     }
 }
 
@@ -224,7 +226,6 @@ private struct CornerMini: View {
         }
         .buttonStyle(.plain)
         .scaleEffect(hover ? 1.1 : 1)
-        .animation(.easeInOut(duration: 0.32), value: ring)
         .onHover { h in withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { hover = h } }
         .help(name)
     }

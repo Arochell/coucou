@@ -61,6 +61,7 @@ final class IslandWindowController: NSWindowController {
     /// While Mochi is dragged near a corner (or the top centre): the place he will take.
     private var snapPanel: NSPanel? = nil
     private var snapShown: IslandPlacement? = nil
+    private var lastGhostTick: CFTimeInterval = 0
     private var highlightWindowPid: pid_t = 0
 
     // Notch real dimensions (set on init)
@@ -416,6 +417,8 @@ final class IslandWindowController: NSWindowController {
     // is elsewhere, so a hidden island costs next to nothing (CLAUDE.md: 0 % CPU when hidden).
 
     private static let fastPoll: TimeInterval = 1.0 / 60.0
+    /// Mochi held by the pointer: 120 Hz, so he glides on a ProMotion screen.
+    private static let dragPoll: TimeInterval = 1.0 / 120.0
     private static let nearPoll: TimeInterval = 1.0 / 20.0
     private static let idlePoll: TimeInterval = 1.0 / 8.0
     private var pollInterval: TimeInterval = 0
@@ -452,7 +455,7 @@ final class IslandWindowController: NSWindowController {
         // only near the island. 60 Hz while open, dragging or close to it.
         let busy = state.mode == .expanded || inAttachDrag || attachDragStart != nil
             || fsm.state == .home || fsm.state == .coucou || fsm.state == .listening || nearIsland
-        let wanted = busy ? Self.fastPoll : inBand ? Self.nearPoll : Self.idlePoll
+        let wanted = inAttachDrag ? Self.dragPoll : busy ? Self.fastPoll : inBand ? Self.nearPoll : Self.idlePoll
         if wanted != pollInterval { startPolling(interval: wanted) }
     }
 
@@ -1126,6 +1129,7 @@ final class IslandWindowController: NSWindowController {
         // He leaves from where he is, then glides to the pointer (updateDragGhost).
         let from = botScreenCenter() ?? mouse
         ghostCurrentOrigin = NSPoint(x: from.x - s/2, y: from.y - s/2)
+        lastGhostTick = CACurrentMediaTime()
 
         let panel = NSPanel(
             contentRect: NSRect(x: ghostCurrentOrigin.x, y: ghostCurrentOrigin.y, width: s, height: s),
@@ -1173,24 +1177,28 @@ final class IslandWindowController: NSWindowController {
         guard let panel = dragGhostPanel else { return }
         let s = dragGhostSize
         let mouse = NSEvent.mouseLocation
+        let now = CACurrentMediaTime()
+        let dt = min(0.05, max(0.001, now - lastGhostTick))
+        lastGhostTick = now
+        var target = NSPoint(x: mouse.x - s/2, y: mouse.y - s/2)
         #if !APPSTORE
-        // Near a corner (or the top centre): the place shows, and Mochi is pulled into it.
+        // Near a corner (or the top centre): the place shows, and the nearer the pointer gets,
+        // the harder Mochi is pulled into it (a gradual magnet, no jump at the zone's edge).
         if let snap = snapTarget(at: mouse) {
             let rect = snap.1
             showSnapTarget(snap.0, rect: rect)
-            let c = NSPoint(x: rect.midX - s/2, y: rect.midY - s/2)
-            let k: CGFloat = 0.35
-            ghostCurrentOrigin = NSPoint(x: ghostCurrentOrigin.x + (c.x - ghostCurrentOrigin.x) * k,
-                                         y: ghostCurrentOrigin.y + (c.y - ghostCurrentOrigin.y) * k)
-            panel.setFrameOrigin(ghostCurrentOrigin)
-            return
+            let d = hypot(mouse.x - rect.midX, mouse.y - rect.midY)
+            let x = max(0, min(1, 1 - (d - 20) / IslandPlacement.snapDistance))
+            let w = x * x * (3 - 2 * x)
+            target = NSPoint(x: target.x + (rect.midX - s/2 - target.x) * w,
+                             y: target.y + (rect.midY - s/2 - target.y) * w)
+        } else {
+            showSnapTarget(nil)
         }
-        showSnapTarget(nil)
         #endif
-        // Held: he catches up with the pointer in a few frames (no jump when he leaves the
-        // island or a corner's place), then follows it closely.
-        let target = NSPoint(x: mouse.x - s/2, y: mouse.y - s/2)
-        let k: CGFloat = 0.4
+        // Eased towards the target, the same however fast the screen refreshes: he catches up
+        // with the pointer in a few frames (no jump), then follows it closely.
+        let k = CGFloat(1 - exp(-dt / 0.045))
         ghostCurrentOrigin = NSPoint(x: ghostCurrentOrigin.x + (target.x - ghostCurrentOrigin.x) * k,
                                      y: ghostCurrentOrigin.y + (target.y - ghostCurrentOrigin.y) * k)
         panel.setFrameOrigin(ghostCurrentOrigin)
