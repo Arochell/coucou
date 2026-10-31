@@ -549,6 +549,8 @@ struct QuestionView: View {
                             .font(.system(size: 12))
                             .foregroundColor(Color(hex: "#F5F6F8"))
                             .focused($otherFieldFocused)
+                            // No Writing Tools button on the island's fields: it lands near the notch (#936).
+                            .writingToolsBehavior(.disabled)
                             .onAppear { otherFieldFocused = true }
                             .onSubmit { commitOtherAndProceed(q: q, qi: qi, isLast: isLast) }
                             .onExitCommand { if qi < showOther.count { showOther[qi] = false } }
@@ -657,7 +659,6 @@ struct QuestionView: View {
         .onChange(of: state.pendingQuestion) { _, _ in resetQuestionState() }
         // The next session's question can read the same as the one just answered.
         .onChange(of: state.waitingQuestions.first?.id) { _, _ in resetQuestionState() }
-        .onDisappear { HookServer.shared.releaseQuestionFD() }
     }
 
     private func resetQuestionState() {
@@ -1536,6 +1537,8 @@ struct PromptView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
                         .focused($focused)
+                        // No Writing Tools button on the island's fields: it lands near the notch (#936).
+                        .writingToolsBehavior(.disabled)
                         .onSubmit { sendMessage() }
 
                     #if !APPSTORE

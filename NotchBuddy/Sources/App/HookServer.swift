@@ -159,6 +159,10 @@ final class HookServer: @unchecked Sendable {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = prev }
             }
         }
+        if questions.head != nil {
+            showQuestionHead()
+            return
+        }
         if let note {
             state.noteMessage = note
             state.view = .note
@@ -301,7 +305,9 @@ final class HookServer: @unchecked Sendable {
     private func showQuestionHead() {
         let state = AppState.shared
         state.waitingQuestions = questions.entries
-        guard let head = questions.head, shownQuestion != head.id else { return }
+        guard let head = questions.head else { return }
+        let needsDisplay = shownQuestion != head.id || state.view != .question
+        guard needsDisplay else { return }
         shownQuestion = head.id
         state.pendingQuestion = head.question
         state.isPinned = true
@@ -344,7 +350,8 @@ final class HookServer: @unchecked Sendable {
         closeQuestionCard(pill: entry.displayPill)
     }
 
-    /// No question left: close the card and give the focus back.
+    /// No question left: close the card and give the focus back, or return to
+    /// an approval waiting behind it (#851).
     @MainActor
     private func closeQuestionCard(pill: String?) {
         let state = AppState.shared
@@ -356,6 +363,17 @@ final class HookServer: @unchecked Sendable {
             if let pill, state.focusId == pill, state.tasks.contains(where: { $0.id == prev }) {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = prev }
             }
+        }
+        if let head = approvals.head {
+            state.pendingApproval = ApprovalInfo(sessionId: head.sessionId, tool: head.tool,
+                                                  command: head.command, inputKey: head.inputKey,
+                                                  pillId: head.displayPill, id: head.id,
+                                                  queueCount: approvals.count,
+                                                  projectName: head.projectName)
+            state.isPinned = true
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = head.displayPill }
+            expandIfNeeded(to: .approval)
+            return
         }
         state.view = state.tasks.isEmpty ? .empty : .overview
     }
@@ -412,9 +430,13 @@ final class HookServer: @unchecked Sendable {
             }
         }
         shownQuestion = nil
+        focusBeforeQuestion = nil
         state.waitingQuestions = []
         state.pendingQuestion = nil
-        for pill in Set(gone.map(\.pillId)) { syncPill(pill) }
+        for pill in Set(gone.map(\.pillId)) {
+            syncPill(pill)
+            clearPillBadge(id: pill)
+        }
     }
 
     /// Called by QuestionView "Reply in terminal" button: question `id` (the card's when nil)
