@@ -119,7 +119,9 @@ pub fn setup(app: &AppHandle) {
         }
         match builder.build() {
             Ok(win) => {
-                let _ = win.set_ignore_cursor_events(true);
+                // Windows: prepare_pill_window also makes the idle window
+                // click-through. Not here for every system: on Linux the
+                // window is not realized yet, and tao unwraps its GdkWindow.
                 if !platform::prepare_pill_window(&win, mode) {
                     let _ = win.destroy();
                     mode = DesktopMode::Off;
