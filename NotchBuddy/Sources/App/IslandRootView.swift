@@ -17,12 +17,45 @@ struct IslandRootView: View {
                 IslandContainer(state: state)
                     .padding(.horizontal, IslandPlacement.side)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: placement.alignment)
+                // Mochi over it, in a box fixed at the same corner of the panel: nothing around
+                // him moves while the island grows, so he only follows his own spring (inside the
+                // growing island, its frame and his box were each rounded to the pixel on their
+                // own and he shook on his way).
+                CornerBot(state: state)
+                    .padding(.horizontal, IslandPlacement.side)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: placement.alignment)
             } else {
                 IslandContainer(state: state)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
         }
         .ignoresSafeArea()
+    }
+}
+
+/// Mochi when the island lives in a corner: in a box held by the panel's corner (no animated
+/// frame around him), placed from the island's final size like BotPlacement does inside it.
+struct CornerBot: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        let p = state.islandPlacement
+        let upload = UploadSequenceEngine.shared
+        let box: CGFloat = 300
+        let (w, fixedH) = islandSize(mode: state.mode, view: state.view, progress: state.uploadProgress,
+                                     nw: state.notchWidth, nh: state.notchHeight)
+        // The chat grows with the conversation (IslandContainer.chatPromptHeight).
+        let h = state.mode == .expanded && state.view == .prompt
+            ? min(300, 240 + CGFloat(state.chatHistory.count) * 40) : fixedH
+        let hidden = state.mode == .expanded && (state.view == .greeting
+            || (upload.isActive && [.upload, .uploading, .choose].contains(state.view)))
+        BotPlacement(state: state, islandW: w, islandH: h,
+                     shift: CGSize(width: p.isRight ? w - box : 0, height: p.isBottom ? h - box : 0),
+                     damping: 0.92)
+            .frame(width: box, height: box)
+            .opacity(hidden ? 0 : 1)
+            .animation(.easeInOut(duration: 0.25), value: hidden)
+            .allowsHitTesting(false)
     }
 }
 
@@ -144,21 +177,8 @@ struct IslandContainer: View {
             // Single BotPlacement — always alive in the view tree so spring animations
             // fire from the current position (e.g. choose at 60,101) when canvas deactivates.
             // Hidden during upload canvas or greeting (both draw their own Mochi).
-            if state.islandPlacement.isCorner {
-                // Held by the island's corner, which stays put while the island grows from it:
-                // Mochi only moves between his own places (the tile's middle, the open corner).
-                let p = state.islandPlacement
-                let box: CGFloat = 300
-                // No mask here: a mask growing with the island cut him while he moved.
-                BotPlacement(state: state, islandW: islandWidth, islandH: islandHeight,
-                             shift: CGSize(width: p.isRight ? islandWidth - box : 0,
-                                           height: p.isBottom ? islandHeight - box : 0),
-                             damping: 0.92)
-                    .frame(width: box, height: box)
-                    .frame(width: islandWidth, height: islandHeight, alignment: p.alignment)
-                    .opacity(uploadActive || greetingActive ? 0 : 1)
-                    .animation(.easeInOut(duration: 0.25), value: uploadActive || greetingActive)
-            } else {
+            // In a corner, Mochi is drawn by IslandRootView (CornerBot), over the island.
+            if !state.islandPlacement.isCorner {
             BotPlacement(state: state, islandW: islandWidth, islandH: islandHeight)
                 // Keep idle animations inside the resting strip. Expanded views
                 // retain the panel's full height for particles and hands.
