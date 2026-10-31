@@ -69,6 +69,8 @@ interface HookPayload {
   term_editor?: string;
   /** StatusLine (the plan usage relay): Claude Code's 5-hour and weekly limits. */
   rate_limits?: unknown;
+  /** SubagentStart / SubagentStop: "Explore", "general-purpose"…; "" for Claude Code's own helpers. */
+  agent_type?: string;
 }
 
 const PROJECT_ALIASES: Record<string, string> = {
@@ -113,10 +115,12 @@ const TOOL_LABELS: Record<string, string> = {
   replace_file_content: N_("Edits"),
   read_url_content: N_("Fetches"),
   search_web: N_("Searches the web"),
+  ask_question: N_("Needs input"),
 };
 
 function stepLabel(tool: string, input: Record<string, unknown>): string {
-  const label = TOOL_LABELS[tool] ? t(TOOL_LABELS[tool]) : tool;
+  const labelTool = tool === "ask_question" || tool.endsWith(":ask_question") ? "ask_question" : tool;
+  const label = TOOL_LABELS[labelTool] ? t(TOOL_LABELS[labelTool]) : tool;
   const str = (k: string) => (typeof input[k] === "string" ? (input[k] as string) : null);
   const cmd = str("command");
   if (cmd) return `${label} · ${cmd.slice(0, 40)}`;
@@ -126,6 +130,17 @@ function stepLabel(tool: string, input: Record<string, unknown>): string {
   if (file) return `${label} · ${lastPathComponent(file)}`;
   const query = str("query");
   if (query) return `${label} · ${query.slice(0, 40)}`;
+  if (
+    (tool === "ask_question" || tool.endsWith(":ask_question")) &&
+    Array.isArray(input.questions) &&
+    input.questions.length > 0
+  ) {
+    const firstQ = input.questions[0];
+    if (typeof firstQ === "object" && firstQ !== null && typeof (firstQ as Record<string, unknown>).question === "string") {
+      const q = ((firstQ as Record<string, unknown>).question as string).trim();
+      if (q) return `${label} · ${q.slice(0, 40)}`;
+    }
+  }
   return label;
 }
 
@@ -228,6 +243,14 @@ export function registerHookHandlers(island: Island) {
   // The last plan numbers seen survive a restart, as on the Mac.
   State.planUsage ??= restorePlanUsage(storedClaudePlanUsage());
   void onEvent<HookPayload>("hook", (payload) => handleHook(island, payload));
+  // The relay stopped waiting without a decision and the terminal has taken
+  // over: a card still up for that request would be lying (#857).
+  void onEvent<string>("approval-expired", (requestId) => {
+    if (State.pendingApproval?.requestId !== requestId) return;
+    if (pendingTimeout != null) window.clearTimeout(pendingTimeout);
+    pendingTimeout = null;
+    dropPendingCard(island);
+  });
 }
 
 function handleHook(island: Island, payload: HookPayload) {
@@ -341,10 +364,18 @@ function handleHook(island: Island, payload: HookPayload) {
       ensurePill();
       supersedeStop();
       clearFinalLine(agentId);
-      State.updateTask(agentId, "working");
       const tool = payload.tool_name ?? "Tool";
-      State.appendStep(agentId, stepLabel(tool, payload.tool_input ?? {}));
-      surface("overview", false);
+      const isQuestion = tool === "ask_question" || tool.endsWith(":ask_question");
+      if (isQuestion) {
+        State.updateTask(agentId, "question");
+        State.appendStep(agentId, stepLabel(tool, payload.tool_input ?? {}));
+        Sound.play("question");
+        surface("overview", true);
+      } else {
+        State.updateTask(agentId, "working");
+        State.appendStep(agentId, stepLabel(tool, payload.tool_input ?? {}));
+        surface("overview", false);
+      }
       break;
     }
 
@@ -450,6 +481,10 @@ function handleHook(island: Island, payload: HookPayload) {
       break;
 
     case "SubagentStop":
+      // Claude Code's own helpers (the prompt suggestion after each turn) end
+      // with a SubagentStop of empty agent_type and never start one. Shown, it
+      // pushed the turn's last edit off the ticker a few seconds after Stop.
+      if (payload.agent_type === "") break;
       State.appendStep(agentId, t("• subagent done"));
       break;
 
