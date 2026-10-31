@@ -344,7 +344,8 @@ final class HookServer: @unchecked Sendable {
         closeQuestionCard(pill: entry.displayPill)
     }
 
-    /// No question left: close the card and give the focus back.
+    /// No question left: close the card and give the focus back, or return to
+    /// an approval waiting behind it (#851).
     @MainActor
     private func closeQuestionCard(pill: String?) {
         let state = AppState.shared
@@ -356,6 +357,17 @@ final class HookServer: @unchecked Sendable {
             if let pill, state.focusId == pill, state.tasks.contains(where: { $0.id == prev }) {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = prev }
             }
+        }
+        if let head = approvals.head {
+            state.pendingApproval = ApprovalInfo(sessionId: head.sessionId, tool: head.tool,
+                                                  command: head.command, inputKey: head.inputKey,
+                                                  pillId: head.displayPill, id: head.id,
+                                                  queueCount: approvals.count,
+                                                  projectName: head.projectName)
+            state.isPinned = true
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = head.displayPill }
+            expandIfNeeded(to: .approval)
+            return
         }
         state.view = state.tasks.isEmpty ? .empty : .overview
     }
