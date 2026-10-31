@@ -92,6 +92,7 @@ fn xdg_user_dir(text: &str, key: &str, home: &Path) -> Option<PathBuf> {
 /// every launch, so each launch would rewrite the system's registry with
 /// plugin paths that vanish once Coucou quits. Give ours its own file.
 pub fn prepare_environment() {
+    let _ = INHERITED.set(OWN_OVERRIDES.iter().map(|k| (*k, std::env::var_os(k))).collect());
     prefer_x11_on_gnome();
     follow_gnome_text_scaling();
     if std::env::var_os("APPIMAGE").is_none() || std::env::var_os("GST_REGISTRY").is_some() {
@@ -239,16 +240,52 @@ pub fn process_running(_exe: &str) -> bool {
     false
 }
 
-/// Prepares a command to launch a child process: strips Coucou's process-level
-/// GTK/GDK overrides (GDK_BACKEND, GDK_DPI_SCALE) and AppImage environment
-/// variables (GST_REGISTRY*) so they do not leak into child apps (#859).
+/// What the variables Coucou sets for itself (prepare_environment) were when it
+/// started, so its children get the user's own values back.
+static INHERITED: std::sync::OnceLock<Vec<(&'static str, Option<std::ffi::OsString>)>> = std::sync::OnceLock::new();
+/// Set or changed by prepare_environment for this process only.
+const OWN_OVERRIDES: [&str; 3] = ["GDK_BACKEND", "GDK_DPI_SCALE", "GST_REGISTRY"];
+/// Set by the AppImage's launcher for its bundled GStreamer: dropped when they
+/// point inside the AppImage, which a child cannot use.
+const APPIMAGE_GST: [&str; 3] = ["GST_REGISTRY_1_0", "GST_PLUGIN_SYSTEM_PATH", "GST_PLUGIN_SYSTEM_PATH_1_0"];
+
+/// The changes a child's environment needs: `Some` sets the value back, `None`
+/// removes the variable. Nothing for a variable Coucou left as it found it.
+fn child_env(
+    inherited: &[(&str, Option<std::ffi::OsString>)],
+    current: impl Fn(&str) -> Option<std::ffi::OsString>,
+    appdir: Option<&std::ffi::OsStr>,
+) -> Vec<(String, Option<std::ffi::OsString>)> {
+    let mut out = Vec::new();
+    for (key, was) in inherited {
+        if current(key) != *was {
+            out.push((key.to_string(), was.clone()));
+        }
+    }
+    if let Some(dir) = appdir.and_then(|d| d.to_str()).filter(|d| !d.is_empty()) {
+        for key in APPIMAGE_GST {
+            if current(key).is_some_and(|v| v.to_string_lossy().contains(dir)) {
+                out.push((key.to_string(), None));
+            }
+        }
+    }
+    out
+}
+
+/// Prepares a command to launch a child process: Coucou's own GDK and
+/// GStreamer settings (GDK_BACKEND=x11 on GNOME, GDK_DPI_SCALE, the AppImage's
+/// GStreamer paths) go back to what the user had, so they do not leak into the
+/// browser, the editor or the apps it opens (#859).
 pub fn no_console(cmd: &mut Command) -> &mut Command {
-    cmd.env_remove("GDK_BACKEND")
-        .env_remove("GDK_DPI_SCALE")
-        .env_remove("GST_REGISTRY")
-        .env_remove("GST_REGISTRY_1_0")
-        .env_remove("GST_PLUGIN_SYSTEM_PATH")
-        .env_remove("GST_PLUGIN_SYSTEM_PATH_1_0")
+    let inherited = INHERITED.get().map(Vec::as_slice).unwrap_or(&[]);
+    let appdir = std::env::var_os("APPDIR");
+    for (key, value) in child_env(inherited, |k| std::env::var_os(k), appdir.as_deref()) {
+        match value {
+            Some(v) => cmd.env(key, v),
+            None => cmd.env_remove(key),
+        };
+    }
+    cmd
 }
 
 pub fn open_url(url: &str) {
@@ -861,22 +898,30 @@ mod tests {
     }
 
     #[test]
-    fn no_console_strips_gtk_and_gstreamer_leakage() {
-        let mut cmd = Command::new("true");
-        cmd.env("GDK_BACKEND", "x11")
-            .env("GDK_DPI_SCALE", "0.8")
-            .env("GST_REGISTRY", "/tmp/reg")
-            .env("GST_REGISTRY_1_0", "/tmp/reg1")
-            .env("GST_PLUGIN_SYSTEM_PATH", "/tmp/sys")
-            .env("GST_PLUGIN_SYSTEM_PATH_1_0", "/tmp/sys1");
-        no_console(&mut cmd);
-        let envs: std::collections::HashMap<_, _> = cmd.get_envs().collect();
-        assert_eq!(envs.get(std::ffi::OsStr::new("GDK_BACKEND")), Some(&None));
-        assert_eq!(envs.get(std::ffi::OsStr::new("GDK_DPI_SCALE")), Some(&None));
-        assert_eq!(envs.get(std::ffi::OsStr::new("GST_REGISTRY")), Some(&None));
-        assert_eq!(envs.get(std::ffi::OsStr::new("GST_REGISTRY_1_0")), Some(&None));
-        assert_eq!(envs.get(std::ffi::OsStr::new("GST_PLUGIN_SYSTEM_PATH")), Some(&None));
-        assert_eq!(envs.get(std::ffi::OsStr::new("GST_PLUGIN_SYSTEM_PATH_1_0")), Some(&None));
+    fn children_get_the_users_own_gdk_and_gstreamer_settings_back() {
+        use std::ffi::{OsStr, OsString};
+        let current = |k: &str| -> Option<OsString> {
+            match k {
+                "GDK_BACKEND" => Some("x11".into()),
+                "GDK_DPI_SCALE" => Some("0.8".into()),
+                "GST_REGISTRY" => Some("/home/u/.cache/coucou/gstreamer-registry.bin".into()),
+                "GST_PLUGIN_SYSTEM_PATH_1_0" => Some("/tmp/.mount_CoucouX/usr/lib/gstreamer-1.0".into()),
+                "GST_PLUGIN_SYSTEM_PATH" => Some("/usr/lib/gstreamer-1.0".into()),
+                _ => None,
+            }
+        };
+        // Coucou forced x11 over the user's wayland, and set the other two itself.
+        let inherited = [("GDK_BACKEND", Some(OsString::from("wayland"))), ("GDK_DPI_SCALE", None), ("GST_REGISTRY", None)];
+        let fixes = child_env(&inherited, current, Some(OsStr::new("/tmp/.mount_CoucouX")));
+        assert_eq!(fixes, vec![
+            ("GDK_BACKEND".to_string(), Some(OsString::from("wayland"))),
+            ("GDK_DPI_SCALE".to_string(), None),
+            ("GST_REGISTRY".to_string(), None),
+            ("GST_PLUGIN_SYSTEM_PATH_1_0".to_string(), None),
+        ]);
+        // Values the user set and Coucou kept (an explicit GDK_DPI_SCALE) stay.
+        let kept = [("GDK_BACKEND", Some(OsString::from("x11"))), ("GDK_DPI_SCALE", Some(OsString::from("0.8")))];
+        assert!(child_env(&kept, current, None).is_empty());
     }
 }
 
