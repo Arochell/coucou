@@ -43,12 +43,13 @@ final class FileDropNSView: NSView {
 // MARK: - File drop handler
 
 enum FileDropHandler {
-    /// Removes inbox files older than 7 days, as on Windows/Linux.
+    /// Removes inbox files older than 7 days, as on Windows/Linux. Hidden files too:
+    /// a dropped `.env` is exactly the kind of copy that must not stay forever.
     static func sweepInbox(inbox: URL) {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: inbox,
             includingPropertiesForKeys: [.contentModificationDateKey],
-            options: .skipsHiddenFiles
+            options: []
         ) else { return }
         let keepFor: TimeInterval = 7 * 24 * 60 * 60
         let now = Date()
@@ -80,23 +81,30 @@ enum FileDropHandler {
         let inbox = HookServer.supportDir.appendingPathComponent("inbox")
         Task.detached {
             try? FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
-            var dest = inbox.appendingPathComponent(name)
-            if FileManager.default.fileExists(atPath: dest.path) && dest != url {
+            let fm = FileManager.default
+            let first = inbox.appendingPathComponent(name)
+            // A file that already lives in the inbox is used where it is.
+            let alreadyInInbox = first.standardizedFileURL.path == url.standardizedFileURL.path
+            var target: URL? = alreadyInInbox || !fm.fileExists(atPath: first.path) ? first : nil
+            if target == nil {
+                // Never overwrite an earlier drop: "notes (2).txt", "notes (3).txt"…
                 let stem = url.deletingPathExtension().lastPathComponent
                 let ext = url.pathExtension.isEmpty ? "" : ".\(url.pathExtension)"
                 for i in 2..<1000 {
                     let candidate = inbox.appendingPathComponent("\(stem) (\(i))\(ext)")
-                    if !FileManager.default.fileExists(atPath: candidate.path) {
-                        dest = candidate
-                        break
-                    }
+                    if !fm.fileExists(atPath: candidate.path) { target = candidate; break }
                 }
             }
-            if dest != url {
-                _ = try? FileManager.default.copyItem(at: url, to: dest)
+            var landed: URL? = nil
+            if let target, alreadyInInbox || (try? fm.copyItem(at: url, to: target)) != nil {
+                // The copy ages from when it landed in the inbox, not from the original's
+                // date — stamped before the sweep, or an old file would go at once.
+                try? fm.setAttributes([.modificationDate: Date()], ofItemAtPath: target.path)
+                landed = target
             }
-            try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: dest.path)
             Self.sweepInbox(inbox: inbox)
+            // Copy failed: the drop keeps pointing at the original file, as before.
+            guard let dest = landed else { return }
             await MainActor.run {
                 state.droppedFile = DroppedFile(url: dest, name: name)
                 state.promptContext = .file(name: name, fileURL: dest)
