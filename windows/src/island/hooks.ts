@@ -470,7 +470,10 @@ function handleHook(island: Island, payload: HookPayload) {
         agentId,
         window.setTimeout(() => {
           stopTimers.delete(agentId);
-          restoreAlertFocus();
+          // While the island is open the alert's card stays on its own pill, and the
+          // pill you had comes back when it closes (island.ts), as on the Mac. An agent
+          // pill about to go hands the front back now.
+          if (isExternalAgent || State.mode !== "expanded") restoreAlertFocus();
           if (isExternalAgent) {
             State.removeTask(agentId);
           } else {

@@ -388,6 +388,8 @@ export class Island {
       // A folded card is still waiting: it keeps the island pinned.
       if (!State.pendingApproval) State.isPinned = false;
       void Bridge.focusWindow(false);
+      // Another pill's alert borrowed the front: the pill you had comes back (Mac).
+      restoreAlertFocus();
     }
     if (mode !== "expanded") {
       closePlanCard();
@@ -445,7 +447,6 @@ export class Island {
       this.foldApproval();
       return;
     }
-    restoreAlertFocus();
     State.isPinned = false;
     this.fsm.pinned = false;
     // Drive the state machine rather than the mode: setting the mode behind its

@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { calls, emit, sent } from "./tauri.mjs";
-import { registerHookHandlers } from "../src/island/hooks.ts";
+import { registerHookHandlers, restoreAlertFocus } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 import { Sound } from "../src/core/sound.ts";
 import { setLanguage } from "../src/i18n/i18n.ts";
@@ -188,6 +188,18 @@ test("alertsFromAllPills: unfocused pill alert opens the island and restores foc
   seconds(5.2);
   assert.equal(State.focusId, "integration_n8n");
   State.settings.alertsFromAllPills = false;
+});
+
+test("alertsFromAllPills: while the island is open the alert's pill keeps the front", () => {
+  State.settings.alertsFromAllPills = true;
+  State.setFocus("integration_n8n");
+  hook({ hook_event_name: "Stop" });
+  State.mode = "expanded";
+  seconds(5.2);
+  // The finished card still names the pill that finished; closing gives n8n back.
+  assert.equal(State.focusId, "integration_claude");
+  restoreAlertFocus();
+  assert.equal(State.focusId, "integration_n8n");
 });
 
 test("a failed stop shows the error view, or the error badge behind another pill", () => {
