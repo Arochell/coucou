@@ -47,6 +47,7 @@ struct HubMailOverviewPage: View {
                     }
                 }
             }
+                .settingsAnchor("mail.autosort", cornerRadius: 14)
 
             let today = store.today
             HStack(spacing: 12) {
