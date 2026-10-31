@@ -472,7 +472,12 @@ func botPosition(mode: IslandMode, view: IslandView, islandW: CGFloat, islandH: 
         switch mode {
         // The corner tile: Mochi alone, big, in its middle.
         case .hidden, .compact:
-            return (islandW / 2, islandH / 2 - 2, min(38, max(0, islandH - 22)), 1)
+            // Measured from the island's corner, not its middle: right after a mode change the
+            // size is still the open one, and the middle of that would send him across it.
+            let t = IslandPlacement.tile
+            return (placement.isRight ? islandW - t / 2 : t / 2,
+                    (placement.isBottom ? islandH - t / 2 : t / 2) - 2,
+                    min(38, max(0, t - 22)), 1)
         case .expanded where view == .overview:
             // Open: Mochi in the island's corner, the other pills around him (CornerArcView).
             let c = placement.cornerBotCenter(in: CGSize(width: islandW, height: islandH))

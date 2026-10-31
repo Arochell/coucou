@@ -18,6 +18,8 @@ struct CornerArcView: View {
     @State private var swapStart = Date.distantPast
     /// Circles drawn out (ring off): the one a Mochi left, the one a Mochi just reached.
     @State private var ringOff: Set<String> = []
+    /// Tapped, its circle drawing itself out before the flight.
+    @State private var pendingTap: String? = nil
 
     private struct Swap: Equatable {
         let incoming: AgentTask
@@ -32,7 +34,9 @@ struct CornerArcView: View {
     /// Mochi's size in the corner, and on the circle (the swap grows one and shrinks the other).
     static let bigBody: CGFloat = 58
     static let smallBody: CGFloat = 24
-    static let swapDuration: Double = 0.55
+    static let swapDuration: Double = 0.5
+    /// The tapped one's circle draws itself out first, this long, then the two fly.
+    static let ringOutDuration: Double = 0.2
 
     private var arcTasks: [AgentTask] {
         let focus = state.focusTask?.id
@@ -62,7 +66,7 @@ struct CornerArcView: View {
 
             ForEach(Array(tasks.enumerated()), id: \.element.id) { i, task in
                 let leaving = swap?.incoming.id == task.id
-                // Its Mochi on its way to the corner (drawn below): its circle draws itself out.
+                // Its circle draws itself out, then its Mochi flies to the corner (drawn below).
                 CornerMini(task: task, ring: ringOff.contains(task.id) ? 0 : 1, showBot: !leaving) {
                     start(task, at: i, current: tasks)
                 }
@@ -92,19 +96,42 @@ struct CornerArcView: View {
         }
         .frame(width: islandW, height: islandH, alignment: .topLeading)
         .animation(.spring(response: 0.42, dampingFraction: 0.8), value: tasks.map(\.id))
-        .onDisappear { if swap != nil { finish() } }
+        .onAppear { swapPending(after: 0.42) }
+        .onChange(of: state.cornerPendingSwap) { _, _ in swapPending(after: 0.1) }
+        .onDisappear {
+            pendingTap = nil
+            if swap != nil { finish() }
+        }
+    }
+
+    /// A pill clicked in the compact tile's row: the island has opened, now it swaps with Mochi.
+    private func swapPending(after delay: Double) {
+        guard let id = state.cornerPendingSwap else { return }
+        state.cornerPendingSwap = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            let tasks = arcTasks
+            guard let i = tasks.firstIndex(where: { $0.id == id }) else { return }
+            start(tasks[i], at: i, current: tasks)
+        }
     }
 
     private func start(_ task: AgentTask, at index: Int, current: [AgentTask]) {
-        guard swap == nil, let focus = state.focusTask else { return }
+        guard swap == nil, pendingTap == nil, let focus = state.focusTask else { return }
         var ids = current.map(\.id)
         if index < ids.count { ids[index] = focus.id }
-        swapStart = Date()
-        swap = Swap(incoming: task, outgoing: focus, slot: index, order: ids)
+        // First its circle and its name go (from the top down both sides)…
+        pendingTap = task.id
         ringOff.insert(task.id)
-        state.cornerSwapping = true
         SoundEngine.shared.play("blip")
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.swapDuration) { finish() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.ringOutDuration) {
+            guard pendingTap == task.id else { return }
+            pendingTap = nil
+            // …then both fly, crossing.
+            swapStart = Date()
+            swap = Swap(incoming: task, outgoing: focus, slot: index, order: ids)
+            state.cornerSwapping = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.swapDuration) { finish() }
+        }
     }
 
     /// Both have arrived: the one in the corner is now the focus, the other is on the circle.
@@ -166,12 +193,9 @@ private struct CornerMini: View {
                     Circle()
                         .fill(hover ? color.opacity(0.18) : Color(hex: "#0E0F11"))
                         .opacity(ring)
-                    HalfRing(right: true)
-                        .trim(from: 0, to: ring)
-                        .stroke(color.opacity(hover ? 0.6 : 0.3), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
-                    HalfRing(right: false)
-                        .trim(from: 0, to: ring)
-                        .stroke(color.opacity(hover ? 0.6 : 0.3), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+                    // Drawn in from the top, drawn out towards the bottom; whole, a plain circle.
+                    RingShape(progress: ring, fromBottom: ring < 0.5)
+                        .stroke(color.opacity(hover ? 0.6 : 0.3), lineWidth: 1.2)
                     MiniBotCanvasView(task: task)
                         .frame(width: CornerArcView.smallBody / 0.6, height: CornerArcView.smallBody / 0.6)
                         .frame(width: CornerArcView.smallBody, height: CornerArcView.smallBody)
@@ -192,8 +216,9 @@ private struct CornerMini: View {
                     .foregroundColor(hover ? color.lighter(by: 0.3) : Color(hex: "#8E939C"))
                     .lineLimit(1)
                     .fixedSize()
-                    .offset(y: 15 - 4 * (1 - ring))
+                    .offset(y: 15 - 5 * (1 - ring))
                     .opacity(ring)
+                    .blur(radius: 2 * (1 - ring))
                     .allowsHitTesting(false)
             }
         }
@@ -205,15 +230,30 @@ private struct CornerMini: View {
     }
 }
 
-/// Half a circle, from its top down to its bottom, on the right side or the left one.
-private struct HalfRing: Shape {
-    let right: Bool
+/// The circle around a Mochi on the arc, drawn in part: an arc spread evenly on both sides of
+/// its top (`fromBottom` false: drawing itself in, down both sides) or of its bottom (true: the
+/// gap opens at the top and runs down both sides as it goes). Whole, a plain circle: no seam.
+private struct RingShape: Shape {
+    var progress: CGFloat
+    let fromBottom: Bool
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
 
     func path(in rect: CGRect) -> Path {
         var p = Path()
-        // SwiftUI's y goes down: "not clockwise" here turns clockwise on screen (the right side).
-        p.addArc(center: CGPoint(x: rect.midX, y: rect.midY), radius: min(rect.width, rect.height) / 2,
-                 startAngle: .degrees(-90), endAngle: .degrees(90), clockwise: !right)
+        let r = min(rect.width, rect.height) / 2
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        if progress >= 0.999 {
+            p.addEllipse(in: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+        } else if progress > 0.001 {
+            let mid: Double = fromBottom ? 90 : -90
+            let half = 180 * Double(progress)
+            p.addArc(center: c, radius: r, startAngle: .degrees(mid - half), endAngle: .degrees(mid + half),
+                     clockwise: false)
+        }
         return p
     }
 }
@@ -243,7 +283,8 @@ struct CornerBubbles: View {
             ForEach(Array(tasks.enumerated()), id: \.element.id) { i, task in
                 let out = i < shown
                 let from = i == 0 ? CGPoint(x: t / 2, y: t / 2) : centers[i - 1]
-                CornerBubble(task: task) { state.setFocus(task.id) }
+                // The click opens the island; there it swaps places with Mochi.
+                CornerBubble(task: task) { state.cornerPendingSwap = task.id }
                     .scaleEffect(out ? 1 : 0.3)
                     .opacity(out ? 1 : 0)
                     .position(out ? centers[i] : from)

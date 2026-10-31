@@ -1123,7 +1123,9 @@ final class IslandWindowController: NSWindowController {
 
         let mouse = NSEvent.mouseLocation
         let s = dragGhostSize
-        ghostCurrentOrigin = NSPoint(x: mouse.x - s/2, y: mouse.y - s/2)
+        // He leaves from where he is, then glides to the pointer (updateDragGhost).
+        let from = botScreenCenter() ?? mouse
+        ghostCurrentOrigin = NSPoint(x: from.x - s/2, y: from.y - s/2)
 
         let panel = NSPanel(
             contentRect: NSRect(x: ghostCurrentOrigin.x, y: ghostCurrentOrigin.y, width: s, height: s),
@@ -1185,9 +1187,24 @@ final class IslandWindowController: NSWindowController {
         }
         showSnapTarget(nil)
         #endif
-        // Direct follow — bot is "held", no trailing lag
-        ghostCurrentOrigin = NSPoint(x: mouse.x - s/2, y: mouse.y - s/2)
+        // Held: he catches up with the pointer in a few frames (no jump when he leaves the
+        // island or a corner's place), then follows it closely.
+        let target = NSPoint(x: mouse.x - s/2, y: mouse.y - s/2)
+        let k: CGFloat = 0.4
+        ghostCurrentOrigin = NSPoint(x: ghostCurrentOrigin.x + (target.x - ghostCurrentOrigin.x) * k,
+                                     y: ghostCurrentOrigin.y + (target.y - ghostCurrentOrigin.y) * k)
         panel.setFrameOrigin(ghostCurrentOrigin)
+    }
+
+    /// Mochi's centre on the screen, where the island draws him now.
+    private func botScreenCenter() -> NSPoint? {
+        let s = state
+        let (w, h) = islandSize(mode: s.mode, view: s.view, progress: s.uploadProgress, nw: notchW, nh: notchH)
+        let (cx, cy, _, _) = botPosition(mode: s.mode, view: s.view, islandW: w, islandH: h,
+                                         uploadProgress: s.uploadProgress, hasNotch: s.hasNotch)
+        let rect = Self.islandScreenRect(size: CGSize(width: w, height: h))
+        guard rect.width > 0 else { return nil }
+        return NSPoint(x: rect.minX + cx, y: rect.maxY - cy)
     }
 
     /// The placement a drop at `mouse` would move the island to (not the one it has), and the
