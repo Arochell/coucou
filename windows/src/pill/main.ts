@@ -81,7 +81,7 @@ function look(): Look {
   }
 }
 
-const vertical = () => state.edge !== "bottom";
+const vertical = () => state.edge === "left" || state.edge === "right";
 
 function messageText(): string | null {
   switch (state.phase) {
@@ -303,6 +303,14 @@ function reportHot() {
     const w = open ? 200 : 96;
     const h = open ? 46 : 26;
     rects.push([(W - w) / 2, H - h, w, h]);
+  } else if (state.edge === "bottom-left") {
+    const w = open ? 200 : 96;
+    const h = open ? 46 : 26;
+    rects.push([0, H - h, w, h]);
+  } else if (state.edge === "bottom-right") {
+    const w = open ? 200 : 96;
+    const h = open ? 46 : 26;
+    rects.push([W - w, H - h, w, h]);
   } else {
     const w = open ? 46 : 26;
     const h = open ? 200 : 96;
