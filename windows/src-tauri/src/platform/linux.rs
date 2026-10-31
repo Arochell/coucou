@@ -273,7 +273,12 @@ pub fn find_on_path(stem: &str) -> Option<PathBuf> {
 /// directly by executable, or via its registered claude:// scheme handler.
 pub fn open_claude_desktop() -> bool {
     open_claude_with(
-        || Command::new("gtk-launch").arg("claude-desktop").spawn().is_ok(),
+        || {
+            // gtk-launch itself starts fine whether the entry exists or not:
+            // look for the entry first, or the fallbacks below never run.
+            desktop_entry_exists("claude-desktop.desktop")
+                && no_console(Command::new("gtk-launch").arg("claude-desktop")).spawn().is_ok()
+        },
         || {
             let candidates = [
                 find_on_path("claude-desktop"),
@@ -283,14 +288,24 @@ pub fn open_claude_desktop() -> bool {
                 Some(home_dir().join(".local/bin/claude-desktop")),
             ];
             for path in candidates.into_iter().flatten() {
-                if path.is_file() && Command::new(path).spawn().is_ok() {
+                if path.is_file() && no_console(&mut Command::new(path)).spawn().is_ok() {
                     return true;
                 }
             }
             false
         },
-        || Command::new("xdg-open").arg("claude://").spawn().is_ok(),
+        || no_console(Command::new("xdg-open").arg("claude://")).spawn().is_ok(),
     )
+}
+
+/// A desktop entry with this file name in the system's or the user's
+/// applications folders (XDG_DATA_HOME, then XDG_DATA_DIRS).
+fn desktop_entry_exists(file: &str) -> bool {
+    let dirs = std::env::var("XDG_DATA_DIRS").unwrap_or_default();
+    let system = if dirs.trim().is_empty() { "/usr/local/share:/usr/share".to_string() } else { dirs };
+    std::iter::once(xdg("XDG_DATA_HOME", ".local/share"))
+        .chain(std::env::split_paths(&system))
+        .any(|dir| dir.join("applications").join(file).is_file())
 }
 
 fn open_claude_with(
