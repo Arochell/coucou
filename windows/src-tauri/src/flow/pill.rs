@@ -119,6 +119,9 @@ pub fn setup(app: &AppHandle) {
         }
         match builder.build() {
             Ok(win) => {
+                // Windows: prepare_pill_window also makes the idle window
+                // click-through. Not here for every system: on Linux the
+                // window is not realized yet, and tao unwraps its GdkWindow.
                 if !platform::prepare_pill_window(&win, mode) {
                     let _ = win.destroy();
                     mode = DesktopMode::Off;
@@ -251,6 +254,7 @@ fn show(app: &AppHandle, pill: &Pill, visible: bool) {
         DesktopMode::Poll => {
             if !visible {
                 let _ = win.set_position(PhysicalPosition::new(PARKED.0, PARKED.1));
+                let _ = win.set_ignore_cursor_events(true);
             }
             let (lock, cv) = &pill.poll;
             *lock.lock().unwrap() = visible;
@@ -338,13 +342,18 @@ pub fn set_hot(app: &AppHandle, rects: Vec<(f64, f64, f64, f64)>) {
 /// mouse only over the pill and its bubble.
 fn spawn_poll(app: AppHandle, pill: Arc<Pill>) {
     std::thread::spawn(move || {
-        let mut ignoring: Option<bool> = None;
+        let mut ignoring: Option<bool> = Some(true);
         loop {
             {
                 let (lock, cv) = &pill.poll;
                 let mut on = lock.lock().unwrap();
                 while !*on {
-                    ignoring = None;
+                    if ignoring != Some(true) {
+                        ignoring = Some(true);
+                        if let Some(win) = window(&app) {
+                            let _ = win.set_ignore_cursor_events(true);
+                        }
+                    }
                     on = cv.wait(on).unwrap();
                 }
             }
