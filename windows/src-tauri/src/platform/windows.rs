@@ -10,7 +10,7 @@ use tauri::{AppHandle, Manager, WebviewWindow};
 
 use ::windows::core::{w, BOOL, PWSTR};
 use ::windows::Win32::Foundation::{
-    CloseHandle, HANDLE, HLOCAL, HWND, LPARAM, LocalFree, POINT, RECT, RPC_E_CHANGED_MODE,
+    CloseHandle, HANDLE, HLOCAL, HWND, LPARAM, LocalFree, POINT, RPC_E_CHANGED_MODE,
 };
 use ::windows::Win32::Security::Authorization::ConvertSidToStringSidW;
 use ::windows::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER};
@@ -29,15 +29,13 @@ use ::windows::Win32::UI::Input::KeyboardAndMouse::{
     VK_CONTROL, VK_LBUTTON, VK_MENU, VK_SHIFT,
 };
 use ::windows::Win32::UI::Shell::{
-    SHAppBarMessage, APPBARDATA, ABM_GETTASKBARPOS, ABE_TOP,
     ShellExecuteExW, SHELLEXECUTEINFOW, SEE_MASK_FLAG_NO_UI, SEE_MASK_NOASYNC,
 };
 use ::windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, EnumWindows, GetClassNameW, GetCursorPos, GetWindow, GetWindowLongPtrW,
     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow,
-    SetWindowLongPtrW, ShowWindow, SystemParametersInfoW, GWL_EXSTYLE, GW_OWNER, SW_RESTORE,
-    SW_SHOWNORMAL, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, SPI_GETWORKAREA,
-    SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    SetWindowLongPtrW, ShowWindow, GWL_EXSTYLE, GW_OWNER, SW_RESTORE, SW_SHOWNORMAL, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW,
 };
 
 use super::LocalTime;
@@ -360,44 +358,6 @@ pub fn set_pointer_watch(_active: bool) {}
 
 /// `set_position` already places a Win32 window on the right display.
 pub fn pin_to_monitor(_win: &WebviewWindow, _x: i32, _y: i32) {}
-
-/// Returns the height of a taskbar docked at the top of the monitor (in physical px).
-/// Returns 0 if there is no taskbar at the top.
-pub fn top_taskbar_offset(mx: i32, my: i32, mw: u32, _mh: u32) -> i32 {
-    let mut abd = APPBARDATA {
-        cbSize: std::mem::size_of::<APPBARDATA>() as u32,
-        ..Default::default()
-    };
-    let res = unsafe { SHAppBarMessage(ABM_GETTASKBARPOS, &mut abd) };
-    if res != 0 {
-        let is_top = abd.uEdge == ABE_TOP || (abd.rc.top <= my + 5 && abd.rc.bottom > my);
-        let mid_x = mx + (mw as i32 / 2);
-        let on_this_monitor = abd.rc.left <= mid_x && abd.rc.right >= mid_x;
-        if is_top && on_this_monitor {
-            let height = (abd.rc.bottom - my).max(0);
-            if height > 0 && height < 200 {
-                return height;
-            }
-        }
-    }
-
-    if my == 0 {
-        let mut work = RECT::default();
-        let ok = unsafe {
-            SystemParametersInfoW(
-                SPI_GETWORKAREA,
-                0,
-                Some(&mut work as *mut _ as *mut _),
-                SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
-            )
-        };
-        if ok.is_ok() && work.top > 0 && work.top < 200 {
-            return work.top;
-        }
-    }
-
-    0
-}
 
 // ── Session windows ("Open terminal") ─────────────────────────────────────────
 //
