@@ -234,6 +234,11 @@ pub fn user_full_name() -> Option<String> {
 
 // ── Processes ─────────────────────────────────────────────────────────────────
 
+/// Outlook (the Mail pill) is a Windows program: nothing to look for here.
+pub fn process_running(_exe: &str) -> bool {
+    false
+}
+
 /// Prepares a command to launch a child process: strips Coucou's process-level
 /// GTK/GDK overrides (GDK_BACKEND, GDK_DPI_SCALE) and AppImage environment
 /// variables (GST_REGISTRY*) so they do not leak into child apps (#859).
