@@ -323,7 +323,7 @@ Réglages → Chat → Local models → **Disconnect**. Efface l'URL sauvegardé
 ### Pill Mail : recherche et filtres
 
 - Loupe dans l'en-tête de la carte : un champ de recherche. Mots libres (objet ou expéditeur), `de:` / `from:` pour l'expéditeur, `objet:` / `subject:` pour l'objet, guillemets pour une phrase (`MailQuery.parse`).
-- Filtres rapides sous l'en-tête : Tous · Non lus · Importants (drapeau de Mail) · Aujourd'hui. La recherche et le filtre deviennent une clause `whose` AppleScript sur la boîte de réception de chaque compte (`MailScript.whoseClause`, `MailScript.searchScript`), 60 résultats au plus, les plus récents d'abord.
+- Filtres rapides sous l'en-tête : Tous · Non lus · Importants (drapeau de Mail) · Aujourd'hui. Pas de clause `whose` AppleScript (elle parcourt toute la boîte et fige Mail) : Coucou lit les 300 mails les plus récents de chaque boîte de réception par tranches de 50 (`messages a thru b`, 30 s au plus par lecture) et filtre en Swift (`MailSearch.matches`), 60 résultats au plus, les plus récents d'abord. Un mail ouvert est retrouvé par sa référence directe (`«class mssg» id N`), la recherche dans la boîte ne sert qu'en secours. Au lancement de Mail, Coucou attend 30 s qu'il ait fini de se synchroniser.
 - « Voir plus » au bas de la liste : 12 mails de plus à chaque clic, jusqu'à 60.
 - Détail d'un mail : Important / Pas important (drapeau), Indésirable, et dans « … » : Toujours important (VIP), Toujours ignorer cet expéditeur (son adresse devient un mot banni).
 
