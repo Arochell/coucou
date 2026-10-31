@@ -33,6 +33,8 @@ pub struct Settings {
     /// Show the Claude plan pill (5 h and weekly limits) in the island's header.
     /// Off until the user turns it on, so the header stays as it shipped.
     pub show_plan_in_notch: bool,
+    /// Show the Claude plan percentage in the compact island next to the agent dots.
+    pub show_plan_in_compact_island: bool,
     /// Coucou's status line relay is the one in Claude Code's settings.json.
     /// Like `hooks_installed`, the real state wins at launch over what was stored.
     pub plan_relay_installed: bool,
@@ -150,6 +152,7 @@ impl Default for Settings {
             hooks_installed: false,
             model: default_model(),
             show_plan_in_notch: false,
+            show_plan_in_compact_island: false,
             plan_relay_installed: false,
             show_codex_plan_in_notch: false,
             chat_provider: crate::chat::ANTHROPIC.into(),
@@ -450,6 +453,7 @@ mod tests {
   "hooksInstalled": true,
   "model": "some-model",
   "showPlanInNotch": true,
+  "showPlanInCompactIsland": true,
   "planRelayInstalled": true,
   "showCodexPlanInNotch": true,
   "chatProvider": "ollama",
@@ -970,6 +974,7 @@ mod tests {
                 "hooksInstalled",
                 "model",
                 "showPlanInNotch",
+                "showPlanInCompactIsland",
                 "planRelayInstalled",
                 "showCodexPlanInNotch",
                 "chatProvider",

@@ -120,6 +120,8 @@ export interface Settings {
   model: string;
   /** Show the Claude plan pill (5 h and weekly limits) in the island's header. */
   showPlanInNotch: boolean;
+  /** Show the Claude plan percentage in the compact island next to the agent dots. */
+  showPlanInCompactIsland: boolean;
   /** Coucou's status line relay is installed in Claude Code's settings. */
   planRelayInstalled: boolean;
   /** Show the Codex plan pill in the island's header. */
@@ -187,6 +189,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hooksInstalled: false,
   model: "claude-opus-5",
   showPlanInNotch: false,
+  showPlanInCompactIsland: false,
   planRelayInstalled: false,
   showCodexPlanInNotch: false,
   chatProvider: "anthropic",
