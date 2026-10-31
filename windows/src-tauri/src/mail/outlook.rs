@@ -326,16 +326,44 @@ pub fn parse_output(stdout: &str, stderr: &str, ok: bool) -> Result<serde_json::
     Err(RunError::Failed(why.trim().to_string()))
 }
 
+#[cfg(windows)]
+static SCRIPT_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(windows)]
+pub fn unique_script_path() -> std::path::PathBuf {
+    use std::sync::atomic::Ordering;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let pid = std::process::id();
+    let seq = SCRIPT_SEQ.fetch_add(1, Ordering::Relaxed);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
+    std::env::temp_dir().join(format!("coucou-outlook-{pid}-{seq}-{nanos}.ps1"))
+}
+
+#[cfg(windows)]
+pub struct TempScript(pub std::path::PathBuf);
+
+#[cfg(windows)]
+impl Drop for TempScript {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
 /// Runs a script with Windows PowerShell, `timeout` at most.
 #[cfg(windows)]
 pub async fn run(source: String, timeout: std::time::Duration) -> Result<serde_json::Value, RunError> {
     tauri::async_runtime::spawn_blocking(move || {
         use std::io::Write;
         use std::process::{Command, Stdio};
-        let path = std::env::temp_dir().join(format!("coucou-outlook-{}.ps1", std::process::id() as u64 * 1000 + rand_suffix()));
+        let path = unique_script_path();
+        let _guard = TempScript(path.clone());
         let mut file = std::fs::File::create(&path).map_err(|e| RunError::Failed(e.to_string()))?;
         // A BOM so Windows PowerShell 5.1 reads the script as UTF-8 (names, accents).
-        file.write_all(b"\xEF\xBB\xBF").and_then(|_| file.write_all(source.as_bytes()))
+        file.write_all(b"\xEF\xBB\xBF")
+            .and_then(|_| file.write_all(source.as_bytes()))
             .map_err(|e| RunError::Failed(e.to_string()))?;
         drop(file);
         let mut cmd = Command::new("powershell.exe");
@@ -345,20 +373,13 @@ pub async fn run(source: String, timeout: std::time::Duration) -> Result<serde_j
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         crate::platform::no_console(&mut cmd);
-        let child = cmd.spawn().map_err(|e| RunError::Failed(e.to_string()));
-        let result = child.and_then(|child| wait(child, timeout));
-        let _ = std::fs::remove_file(&path);
-        let out = result?;
+        let child = cmd.spawn().map_err(|e| RunError::Failed(e.to_string()))?;
+        let out = wait(child, timeout)?;
+        drop(_guard);
         parse_output(&String::from_utf8_lossy(&out.stdout), &String::from_utf8_lossy(&out.stderr), out.status.success())
     })
     .await
     .unwrap_or_else(|e| Err(RunError::Failed(e.to_string())))
-}
-
-#[cfg(windows)]
-fn rand_suffix() -> u64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.subsec_nanos() as u64 % 1000).unwrap_or(0)
 }
 
 #[cfg(windows)]
@@ -370,6 +391,7 @@ fn wait(mut child: std::process::Child, timeout: std::time::Duration) -> Result<
             Ok(None) if start.elapsed() < timeout => std::thread::sleep(std::time::Duration::from_millis(50)),
             Ok(None) => {
                 let _ = child.kill();
+                let _ = child.wait();
                 return Err(RunError::Failed("Outlook did not answer in time".into()));
             }
             Err(e) => return Err(RunError::Failed(e.to_string())),
@@ -456,5 +478,22 @@ mod tests {
         ).unwrap();
         assert_eq!(listing.messages[0].id(), "S/E");
         assert!(listing.messages[0].unread);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn unique_script_paths_are_distinct_and_clean_up() {
+        let mut paths = std::collections::HashSet::new();
+        for _ in 0..100 {
+            let p = unique_script_path();
+            assert!(paths.insert(p), "paths must be strictly unique");
+        }
+        let test_path = unique_script_path();
+        std::fs::write(&test_path, b"test").unwrap();
+        assert!(test_path.exists());
+        {
+            let _guard = TempScript(test_path.clone());
+        }
+        assert!(!test_path.exists(), "TempScript must delete the file on drop");
     }
 }
