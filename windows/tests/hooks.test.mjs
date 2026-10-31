@@ -38,6 +38,8 @@ beforeEach(() => {
   State.paused = false;
   State.isPinned = false;
   State.pendingApproval = null;
+  State.approvalQueue = [];
+  State.focusBeforeApproval = null;
   State.settings = { ...DEFAULT_SETTINGS };
   State.loadIntegrationTasks();
 });
@@ -540,6 +542,53 @@ test("a second request is queued in line: it waits for the first card to finish 
   assert.equal(State.approvalQueue.length, 4); // r2 active + r3..r6 queued = 5 total
   ask("r7");
   assert.deepEqual(sent("approval_decline"), [{ requestId: "r7" }]);
+});
+
+test("a request waiting in line leaves the card on screen as it is, and sounds once", (context) => {
+  const sound = context.mock.method(Sound, "play", () => {});
+  ask("r1");
+  assert.deepEqual(sound.mock.calls.map((call) => call.arguments), [["approval"]]);
+  hook({ hook_event_name: "SessionStart", session_id: "d2", coucou_agent: "codex" });
+  asked = [];
+  hook({
+    hook_event_name: "PermissionRequest", request_id: "q1", session_id: "s2", tool_name: "AskUserQuestion",
+    tool_input: { questions: [{ question: "Which?", options: [{ label: "A" }, { label: "B" }] }] },
+  });
+  hook({ hook_event_name: "PermissionRequest", request_id: "c1", session_id: "d2", coucou_agent: "codex", tool_name: "Bash" });
+  // No alert: the island stays on r1's approval card, not on the question's view.
+  assert.deepEqual(asked, []);
+  assert.equal(State.pendingApproval.requestId, "r1");
+  assert.equal(task("agent_codex").pillBadge, "approval");
+  assert.deepEqual(sound.mock.calls.map((call) => call.arguments), [["approval"], ["work"], ["question"], ["approval"]]);
+});
+
+test("the next request in line comes up when the card is dropped, and keeps its own clock", () => {
+  ask("r1");
+  seconds(60);
+  ask("r2", { session_id: "s2", tool_name: "Bash", tool_input: { command: "ls" } });
+  emit("approval-expired", "r1");
+  assert.equal(State.pendingApproval.requestId, "r2");
+  assert.deepEqual(asked.at(-1), "alert:approval");
+  // r1's 110 s run out: r2, which arrived 60 s later, is still on the card.
+  seconds(50);
+  assert.equal(State.pendingApproval?.requestId, "r2");
+  seconds(60);
+  assert.equal(State.pendingApproval, null);
+});
+
+test("a turn that ends takes its requests out of the line and releases them", () => {
+  ask("r1");
+  ask("r2", { session_id: "s2", tool_name: "Bash", tool_input: { command: "ls" } });
+  ask("r3", { session_id: "s2", tool_name: "Bash", tool_input: { command: "pwd" } });
+  hook({ hook_event_name: "Stop", session_id: "s2" });
+  assert.deepEqual(State.approvalQueue, []);
+  assert.deepEqual(sent("approval_decline"), [{ requestId: "r2" }, { requestId: "r3" }]);
+  assert.equal(State.pendingApproval.requestId, "r1");
+  // And when the card's own turn ends, nothing of it is left to come up.
+  ask("r4", { tool_name: "Bash", tool_input: { command: "ls" } });
+  hook({ hook_event_name: "Stop", session_id: "s1" });
+  assert.equal(State.pendingApproval, null);
+  assert.deepEqual(State.approvalQueue, []);
 });
 
 test("the same request arriving twice is acknowledged again, not declined", () => {
