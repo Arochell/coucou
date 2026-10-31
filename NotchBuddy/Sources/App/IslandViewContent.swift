@@ -765,12 +765,10 @@ struct ErrorView: View {
                             NotificationCenter.default.post(name: .islandCollapse, object: nil)
                         }
                     } else {
-                        #if !APPSTORE
                         PrimaryButton("Open terminal") {
                             openSessionApp(task)
                             NotificationCenter.default.post(name: .islandCollapse, object: nil)
                         }
-                        #endif
                     }
                     SecondaryButton("OK") {
                         NotificationCenter.default.post(name: .islandCollapse, object: nil)
@@ -785,15 +783,14 @@ struct ErrorView: View {
     }
 }
 
-#if !APPSTORE
 /// The app a session runs in (its terminal, or VS Code), else any known terminal.
+/// Only brings apps to the front, so the App Store build has it too.
 private func openSessionApp(_ task: AgentTask?) {
     if !(task?.pill == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
        !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
     }
 }
-#endif
 
 /// Brings the Claude desktop app forward (or launches it) — target of the Claude Desktop pill.
 private let claudeDesktopBundleId = "com.anthropic.claudefordesktop"
@@ -830,12 +827,10 @@ struct FinishedView: View {
                             NotificationCenter.default.post(name: .islandCollapse, object: nil)
                         }
                     } else {
-                        #if !APPSTORE
                         PrimaryButton("Open terminal") {
                             openSessionApp(state.focusTask)
                             NotificationCenter.default.post(name: .islandCollapse, object: nil)
                         }
-                        #endif
                     }
                     SecondaryButton("OK") {
                         NotificationCenter.default.post(name: .islandCollapse, object: nil)
@@ -1404,7 +1399,6 @@ struct MailView: View {
 
 // MARK: - Prompt (chat)
 
-#if !APPSTORE
 /// The mic's right-click menu: Automatic (the user's languages) or one fixed language.
 private struct DictationLanguageMenu: View {
     @Bindable var dictation: MacDictation
@@ -1436,7 +1430,6 @@ private struct DictationLanguageMenu: View {
         return chosen == MacDictation.automatic || automatic.contains(chosen) ? automatic : automatic + [chosen]
     }
 }
-#endif
 
 struct PromptView: View {
     @ObservedObject var state: AppState
@@ -1444,9 +1437,7 @@ struct PromptView: View {
     @FocusState private var focused: Bool
     @State private var showModelPicker = false
 
-    #if !APPSTORE
     @State private var dictation = MacDictation()
-    #endif
     var body: some View {
         ZStack(alignment: .leading) {
             CardBackground(wash: .indigo)
@@ -1541,7 +1532,6 @@ struct PromptView: View {
                         .writingToolsBehavior(.disabled)
                         .onSubmit { sendMessage() }
 
-                    #if !APPSTORE
                     // Dictate instead of typing (on-device speech recognition when available)
                     Button {
                         Task {
@@ -1561,7 +1551,6 @@ struct PromptView: View {
                     .onChange(of: dictation.transcript) { _, _ in
                         if dictation.isRecording { text = dictation.text }
                     }
-                    #endif
 
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up")
@@ -1607,7 +1596,6 @@ struct PromptView: View {
     }
 
     private func sendMessage() {
-        #if !APPSTORE
         // Still dictating: take the final words (and the right language) before sending.
         if dictation.isRecording {
             Task {
@@ -1616,7 +1604,6 @@ struct PromptView: View {
             }
             return
         }
-        #endif
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
         text = ""
@@ -5253,6 +5240,10 @@ struct SettingsIslandView: View {
     @ObservedObject var state: AppState
 
     private var claudeConnected: Bool {
+        #if APPSTORE
+        // Sandboxed: ~/.claude isn't readable here, and the hook path has no "NotchBuddy".
+        return HookServer.claudeHooksInstalled()
+        #else
         let url = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/settings.json")
         guard let data = try? Data(contentsOf: url),
@@ -5264,6 +5255,7 @@ struct SettingsIslandView: View {
                 ($0["command"] as? String)?.contains("NotchBuddy") == true
             } ?? false
         }
+        #endif
     }
 
     private var apiConnected: Bool {
