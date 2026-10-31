@@ -390,6 +390,22 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                #if !APPSTORE
+                // The notch or a corner of the screen (IslandPlacement).
+                Picker(String(localized: "island.position"), selection: $state.islandPlacement) {
+                    Text("island.position.notch").tag(IslandPlacement.notch)
+                    Divider()
+                    Text("island.position.top-left").tag(IslandPlacement.topLeft)
+                    Text("island.position.top-right").tag(IslandPlacement.topRight)
+                    Text("island.position.bottom-left").tag(IslandPlacement.bottomLeft)
+                    Text("island.position.bottom-right").tag(IslandPlacement.bottomRight)
+                }
+                .frame(maxWidth: 360)
+                Text("island.position.hint")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                #endif
             }
             .padding(6)
             .onAppear { refreshConnectedScreens() }
