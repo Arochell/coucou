@@ -56,6 +56,8 @@ async function openHub() {
     }])),
     renderNotch: async () => {},
   });
+  // The fake DOM keeps no input value: the settings search field starts empty.
+  for (const input of root.find(".hub-search-input")) input.value = "";
   // The settings entry point wires language changes to this public method.
   const off = onLanguageChange(() => hub.redraw());
   return { root, hub, off, buttons: root.find(".hub-item") };
